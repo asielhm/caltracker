@@ -5,7 +5,7 @@ import {join} from 'node:path';
 import {timingSafeEqual} from 'node:crypto';
 export function validEstimate(e){return e&&typeof e.name==='string'&&e.name.length<=200&&['kcal','p','c','f'].every(k=>Number.isFinite(e[k])&&e[k]>=0&&e[k]<=10000)}
 const root=fileURLToPath(new URL('./dist/',import.meta.url));
-const allowed=new Map([['/','text/html'],['/index.html','text/html'],['/app.js','text/javascript'],['/foods.js','text/javascript'],['/style.css','text/css']]);
+const allowed=new Map([['/','text/html'],['/index.html','text/html'],['/app.js','text/javascript'],['/foods.js','text/javascript'],['/video-foods.js','text/javascript'],['/nutrition.js','text/javascript'],['/style.css','text/css']]);
 const limits=new Map();
 export function createServer(){return http.createServer(async(req,res)=>{
 const json=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data))};

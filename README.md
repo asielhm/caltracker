@@ -10,7 +10,7 @@ Open http://127.0.0.1:3000. `npm run check` validates syntax; `npm test` checks 
 ## Features
 - Daily calorie, protein, carbohydrate and fat totals with editable targets.
 - Breakfast, lunch, merienda and dinner logging; servings or gram adjustments; remove entries.
-- 37 common Argentine and everyday foods, searchable with accent-insensitive matching.
+- 89 foods: 37 generic Argentine/everyday foods and 52 entries transcribed from your video, searchable with accent-insensitive matching.
 - Custom foods with label values, water tracking, daily notes, weight history and 7-day calorie progress.
 - Local browser persistence with JSON backup export/import. No account or cross-device sync. Empty initial diary; no fabricated user history.
 - Camera/upload flow with editable AI estimates before logging, or manual estimates when AI is unavailable.
@@ -23,7 +23,7 @@ For a network host, set `HOST=0.0.0.0`, `APP_PASSWORD` to a strong private passw
 Images are sent to OpenAI only when Analyze is clicked. Images are not saved by this app, and only the user-confirmed estimate is added to the diary. Do not paste API keys into GitHub or the browser.
 
 ## Nutrition data
-`dist/foods.js` contains generic starter estimates per displayed serving, not verified Argentine brand labels or a clinical database. Prepared dishes vary greatly by recipe, edible portion and cooking fat. Values are approximate and calories may differ from simple 4/4/9 arithmetic due to rounding and fiber. Check packaging or a trusted composition database and enter custom foods for precise tracking. The supplied video informs the interaction patterns; its product-specific values were not treated as verified nutrition records.
+`dist/foods.js` contains generic starter estimates per displayed serving, not verified Argentine brand labels or a clinical database. Prepared dishes vary greatly by recipe, edible portion and cooking fat. Values are approximate and calories may differ from simple 4/4/9 arithmetic due to rounding and fiber. Check packaging or a trusted composition database and enter custom foods for precise tracking. The “From your video” category preserves 52 saved entries and their visible calorie values. ISO GOLD and the Union Ganadera milanesa also include the visible macros. These are user-video transcriptions, not verified manufacturer labels. Missing macros and unknown weights are stored as null. Logging these foods adds calories and known macros; the diary flags incomplete macro totals. Only explicitly stated serving weights enable gram scaling. See [VIDEO-FOODS.md](VIDEO-FOODS.md) for the full transcription and timestamps.
 
 ## GitHub and hosting
 Push this directory to the selected GitHub repository. All client assets are in `dist/`; any static host can serve them without a build. A GitHub Pages workflow is included; enable Settings → Pages → Source: GitHub Actions. Private repository Pages availability depends on your GitHub plan, and published Pages may be publicly accessible: configure visibility deliberately before enabling it. The workflow is manual so pushing code does not publish health data or change repository visibility. Diaries stay only in each browser, not in GitHub.

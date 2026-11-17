@@ -1,5 +1,6 @@
+import {videoFoods} from './video-foods.js';
 // Generic estimates per stated serving, not verified brand labels. Prepared recipes vary.
-export const foods=[
+const genericFoods=[
 ['Empanada de carne','1 baked empanada · 100 g',100,250,12,28,10,'🥟','Argentine'],
 ['Empanada de pollo','1 baked empanada · 100 g',100,220,13,26,7,'🥟','Argentine'],
 ['Milanesa de carne','1 fried milanesa · 150 g',150,390,30,24,19,'🥩','Argentine'],
@@ -38,3 +39,5 @@ export const foods=[
 ['Aceite de oliva','1 tablespoon · 14 g',14,124,0,0,14,'🫒','Everyday'],
 ['Azúcar','1 teaspoon · 4 g',4,16,0,4,0,'🥄','Everyday']
 ].map((f,id)=>({id,name:f[0],serving:f[1],grams:f[2],kcal:f[3],p:f[4],c:f[5],f:f[6],emoji:f[7],category:f[8]}));
+
+export const foods = [...genericFoods, ...videoFoods];
