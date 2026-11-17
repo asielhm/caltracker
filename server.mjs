@@ -9,6 +9,17 @@ import { createApi } from "./api.mjs";
 export { validEstimate } from "./api.mjs";
 const root = fileURLToPath(new URL("./dist/", import.meta.url));
 const allowed = new Map([
+  ["/i18n.js", "text/javascript"],
+  ["/brand.css", "text/css"],
+  ["/welcome.html", "text/html"],
+  ["/welcome.css", "text/css"],
+  ["/welcome.js", "text/javascript"],
+  ["/favicon.ico", "image/x-icon"],
+  ["/assets/brand/mark.svg", "image/svg+xml"],
+  ["/assets/brand/logo.svg", "image/svg+xml"],
+  ["/assets/brand/apple-touch-icon.png", "image/png"],
+  ["/assets/brand/nutriar-editorial.webp", "image/webp"],
+
   ["/", "text/html"],
   ["/index.html", "text/html"],
   ["/app.js", "text/javascript"],
@@ -16,6 +27,7 @@ const allowed = new Map([
   ["/video-foods.js", "text/javascript"],
   ["/nutrition.js", "text/javascript"],
   ["/ui.js", "text/javascript"],
+  ["/health-shortcut.js", "text/javascript"],
   ["/diary-data.js", "text/javascript"],
   ["/diary-sync.js", "text/javascript"],
   ["/camera.js", "text/javascript"],
@@ -68,7 +80,7 @@ export function createServer({
             : { body: Readable.toWeb(req), duplex: "half" }),
         });
         const response =
-          url.pathname === "/api/diary"
+          ["/api/diary", "/api/storage-status"].includes(url.pathname)
             ? env.APP_PASSWORD
               ? await diary(request)
               : Response.json(

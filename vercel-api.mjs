@@ -1,12 +1,14 @@
+import { issueHealthToken, validHealthToken } from "./health-auth.mjs";
 import { timingSafeEqual } from "node:crypto";
 import { createDiaryHandler } from "./diary-api.mjs";
 import { createApi } from "./api.mjs";
 export function createVercelHandler({
   env = process.env,
   fetchImpl = globalThis.fetch,
+  redis,
 } = {}) {
   const api = createApi({ fetchImpl });
-  const diary = createDiaryHandler({ env });
+  const diary = createDiaryHandler({ env, redis });
   return async function handleVercel(request, path) {
     // Fail closed until the owner configures a private app password.
     if (!env.APP_PASSWORD)
@@ -18,6 +20,23 @@ export function createVercelHandler({
         },
         { status: 503, headers: { "Cache-Control": "no-store" } },
       );
+    if (path === "/api/health") {
+      const token = request.headers
+        .get("authorization")
+        ?.replace(/^Bearer /, "");
+      if (
+        !request.headers.get("authorization")?.startsWith("Bearer ") ||
+        !validHealthToken(token, env.APP_PASSWORD)
+      )
+        return Response.json(
+          {
+            error:
+              "The Apple Health connection token is invalid or expired. Create a new one using Connect Apple Health.",
+          },
+          { status: 401, headers: { "Cache-Control": "no-store" } },
+        );
+      return diary(request);
+    }
     const expected = Buffer.from(
       "Basic " + Buffer.from("nutriar:" + env.APP_PASSWORD).toString("base64"),
     );
@@ -37,7 +56,16 @@ export function createVercelHandler({
           },
         },
       );
-    if (path === "/api/diary") return diary(request);
+    if (path === "/api/health-token") {
+      if (request.method !== "POST") return new Response(null, { status: 405 });
+      if (request.headers.get("origin") !== new URL(request.url).origin)
+        return new Response(null, { status: 403 });
+      return Response.json(issueHealthToken(env.APP_PASSWORD), {
+        headers: { "Cache-Control": "private, no-store" },
+      });
+    }
+    if (path === "/api/diary" || path === "/api/storage-status")
+      return diary(request);
     if (path === "/api/auth")
       return new Response(null, {
         status: 303,

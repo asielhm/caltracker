@@ -47,6 +47,9 @@ export function createDiarySync({
     if (!response.ok && response.status !== 409) {
       const error = new Error("Cloud unavailable");
       error.status = response.status;
+      try {
+        error.code = (await response.json()).code;
+      } catch {}
       throw error;
     }
     const data = await response.json();
@@ -127,8 +130,10 @@ export function createDiarySync({
         error.status === 401
           ? "Saved on this device · sign in for cloud saving"
           : error.status === 503
-            ? "Saved on this device · cloud database not connected"
-            : "Saved on this device · cloud sync pending; retry when connected",
+            ? error.code === "AUTH_NOT_CONFIGURED"
+              ? "Saved on this device · configure APP_PASSWORD in Vercel"
+              : "Saved on this device · connect database to Production and redeploy (HTTP 503)"
+            : `Saved on this device · cloud sync pending${error.status ? " (HTTP " + error.status + ")" : " (connection unavailable)"}. Select Sync now to retry.`,
       );
     } finally {
       running = false;

@@ -6,3 +6,7 @@ node_modules/
 
 # Generated hosted Worker
 dist/server/
+
+# Local browser verification artifacts
+output/
+.playwright-cli/

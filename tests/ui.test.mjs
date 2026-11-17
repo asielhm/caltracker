@@ -58,7 +58,7 @@ test("theme toggle synchronizes persistent preference, browser chrome and access
   button.onclick();
   assert.equal(document.documentElement.dataset.theme, "dark");
   assert.equal(values.get("nutriar-neon-theme"), "dark");
-  assert.equal(meta.content, "#0c0f13");
+  assert.equal(meta.content, "#151a18");
   assert.equal(button["aria-label"], "Switch to light mode");
   button.onclick();
   assert.equal(document.documentElement.dataset.theme, "light");

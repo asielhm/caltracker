@@ -28,6 +28,21 @@ export function validState(s) {
             (Number.isFinite(v.burned) &&
               v.burned >= 0 &&
               v.burned <= 10000)) &&
+          (v.activitySource === undefined ||
+            ["manual", "health"].includes(v.activitySource)) &&
+          (v.health === undefined ||
+            (v.health &&
+              v.health.source === "apple-health" &&
+              typeof v.health.syncedAt === "string" &&
+              Number.isFinite(Date.parse(v.health.syncedAt)) &&
+              (v.health.steps === undefined ||
+                (Number.isSafeInteger(v.health.steps) &&
+                  v.health.steps >= 0 &&
+                  v.health.steps <= 200000)) &&
+              (v.health.activeKcal === undefined ||
+                (Number.isFinite(v.health.activeKcal) &&
+                  v.health.activeKcal >= 0 &&
+                  v.health.activeKcal <= 10000)))) &&
           Number.isFinite(v.water) &&
           v.water >= 0 &&
           typeof v.note === "string",

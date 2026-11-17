@@ -2990,3 +2990,44 @@ dialog::backdrop {
   font-size: 12px;
   padding: 6px 10px;
 }
+
+.save-status {
+  padding: 14px 16px;
+  border: 1px solid var(--line, #364249);
+  border-radius: 16px;
+  background: var(--surface, #181e24);
+  margin-bottom: 16px;
+  color: var(--text, #e8edf1);
+}
+.save-status #save-message {
+  flex: 1;
+  min-width: 180px;
+}
+.health-readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 16px 0;
+  border-top: 1px solid var(--line, #364249);
+  font-size: 12px;
+}
+.health-readout b {
+  font-size: 22px;
+  margin-left: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.health-readout .textbtn {
+  margin-left: auto;
+}
+.shortcut-guide {
+  margin: 20px 0;
+  line-height: 1.65;
+  font-size: 14px;
+}
+.shortcut-guide li {
+  margin: 12px 0;
+}
+#health-credentials[hidden] {
+  display: none;
+}

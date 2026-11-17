@@ -2,12 +2,24 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const files = {
+  "i18n.js": "text/javascript",
+  "brand.css": "text/css",
+  "welcome.html": "text/html",
+  "welcome.css": "text/css",
+  "welcome.js": "text/javascript",
+  "favicon.ico": "image/x-icon",
+  "assets/brand/mark.svg": "image/svg+xml",
+  "assets/brand/logo.svg": "image/svg+xml",
+  "assets/brand/apple-touch-icon.png": "image/png",
+  "assets/brand/nutriar-editorial.webp": "image/webp",
+
   "index.html": "text/html; charset=utf-8",
   "app.js": "text/javascript",
   "foods.js": "text/javascript",
   "video-foods.js": "text/javascript",
   "nutrition.js": "text/javascript",
   "ui.js": "text/javascript",
+  "health-shortcut.js": "text/javascript",
   "diary-data.js": "text/javascript",
   "diary-sync.js": "text/javascript",
   "camera.js": "text/javascript",

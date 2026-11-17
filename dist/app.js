@@ -1,8 +1,11 @@
+import { initLanguage, currentLocale, localize } from "./i18n.js";
+import { openHealthSetup } from "./health-shortcut.js";
 import { validState, emptyState } from "./diary-data.js";
 import { createDiarySync } from "./diary-sync.js";
 import { openRearCamera, stopCamera, captureCameraPhoto } from "./camera.js";
 import {
   icon,
+  foodIcon,
   hydrateIcons,
   initTheme,
   celebrate,
@@ -17,6 +20,7 @@ import {
   formatMacro,
   validNutrients,
   calorieBalance,
+  activityForDay,
 } from "./nutrition.js";
 import { foods } from "./foods.js";
 const $ = (s) => document.querySelector(s),
@@ -72,7 +76,7 @@ function updateDay(d) {
 function total(d = day()) {
   return summarize(d.entries);
 }
-const num = (n) => Math.round(n).toLocaleString("en-US");
+const num = (n) => Math.round(n).toLocaleString(currentLocale());
 let toastTimer;
 function toast(s) {
   clearTimeout(toastTimer);
@@ -90,6 +94,7 @@ function dateControl() {
   return `<div class="date-navigation"><button class="date-arrow" id="prev" aria-label="Previous day">‹</button><div class="date-capsules">${dateOptions(
     date,
     today(),
+    currentLocale(),
   )
     .map(
       (d) =>
@@ -97,7 +102,7 @@ function dateControl() {
     )
     .join(
       "",
-    )}</div><button class="date-arrow" id="next" aria-label="Next day">›</button></div><div class="date-caption"><span>${new Date(date + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })}</span><label class="date-picker">Choose date<input id="date" type="date" value="${date}" aria-label="Choose diary date"></label></div>`;
+    )}</div><button class="date-arrow" id="next" aria-label="Next day">›</button></div><div class="date-caption"><span>${new Date(date + "T12:00:00Z").toLocaleDateString(currentLocale(), { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })}</span><label class="date-picker">Choose date<input id="date" type="date" value="${date}" aria-label="Choose diary date"></label></div>`;
 }
 function heading(title, sub, control = "") {
   return `<div class="intro"><div><h1>${title}</h1><p>${sub}</p></div>${control}</div>`;
@@ -119,7 +124,7 @@ function renderDiary() {
   const d = day(),
     t = total(),
     g = state.goals,
-    balance = calorieBalance(g.kcal, t.kcal, d.burned);
+    balance = calorieBalance(g.kcal, t.kcal, activityForDay(d));
   $("#app").innerHTML =
     heading(
       "My <span>Diary</span>",
@@ -135,7 +140,7 @@ function renderDiary() {
 <div class="meter-axis" aria-hidden="true"></div>
 <div class="flank-stat eaten-stat"><span>Eaten</span><b data-count="kcal">${num(t.kcal)}</b><small>kcal logged</small></div>
 <div class="meter-orb"><div class="orb-aura"></div><svg class="energy-dial" viewBox="0 0 250 250" role="img" aria-label="${Math.round(balance.progress * 100)} percent of daily energy budget logged"><defs><linearGradient id="neon-energy" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#36e7ec"/><stop offset=".5" stop-color="#41f6af"/><stop offset="1" stop-color="#a0ff68"/></linearGradient><filter id="ring-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter></defs><circle class="orbit-line orbit-outer" cx="125" cy="125" r="121"/><circle class="orbit-line orbit-fragment" cx="125" cy="125" r="113" stroke-dasharray="255 455"/><circle class="dial-track" cx="125" cy="125" r="96"/><circle class="energy-glow" cx="125" cy="125" r="96" stroke="url(#neon-energy)" stroke-dasharray="603.19" stroke-dashoffset="${603.19 * (1 - balance.progress)}" filter="url(#ring-glow)"/><circle class="energy-ring" cx="125" cy="125" r="96" stroke="url(#neon-energy)" stroke-dasharray="603.19" stroke-dashoffset="${603.19 * (1 - balance.progress)}"/></svg><div class="orb-center"><span class="cal-left-label">${icon("bolt")} ${balance.left < 0 ? "Above budget" : "Cal left"}</span><strong data-count="left">${num(Math.abs(balance.left))}</strong><span class="orb-unit">KILOCALORIES</span></div><span class="meter-readout">${Math.round(balance.progress * 100)}% OF DAILY BUDGET</span></div>
-<button class="flank-stat burned-stat" id="burned" aria-label="Edit calories burned"><span>Burned ${icon("plus")}</span><b>${num(balance.burned)}</b><small>kcal · add activity</small></button>
+<button class="flank-stat burned-stat" id="burned" aria-label="Edit calories burned"><span>Burned ${icon("plus")}</span><b>${num(balance.burned)}</b><small>${d.health?.activeKcal !== undefined && d.activitySource !== "manual" ? "active kcal · Apple Health" : "kcal · manual activity"}</small></button>
 </div>
 <div class="macro-strip">${[
       ["c", "Carbs", "carbs"],
@@ -144,10 +149,11 @@ function renderDiary() {
     ]
       .map(
         ([k, l, cls]) =>
-          `<section class="macro-readout ${cls}" aria-label="${l} progress"><div class="section-head"><span>${l}</span><span class="macro-percent">${t.missing[k] ? "Partial" : Math.round((t[k] / g[k]) * 100) + "%"}</span></div><div class="macro-line" role="progressbar" aria-label="${l}${t.missing[k] ? " (known amounts only)" : ""}" aria-valuemin="0" aria-valuemax="${g[k]}" aria-valuenow="${Math.min(g[k], t[k])}"><i style="width:${Math.min(100, (t[k] / g[k]) * 100)}%"></i></div><div class="macro-data"><b data-count="${k}">${Math.round(t[k] * 10) / 10}</b><b>${t.missing[k] ? "+" : ""}<small>g</small></b><span>/ ${g[k]} g</span></div></section>`,
+          `<section class="macro-readout ${cls}" aria-label="${l} progress"><div class="section-head"><span>${icon({ c: "grain", p: "protein", f: "drop" }[k])} ${l}</span><span class="macro-percent">${t.missing[k] ? "Partial" : Math.round((t[k] / g[k]) * 100) + "%"}</span></div><div class="macro-line" role="progressbar" aria-label="${l}${t.missing[k] ? " (known amounts only)" : ""}" aria-valuemin="0" aria-valuemax="${g[k]}" aria-valuenow="${Math.min(g[k], t[k])}"><i style="width:${Math.min(100, (t[k] / g[k]) * 100)}%"></i></div><div class="macro-data"><b data-count="${k}">${Math.round(t[k] * 10) / 10}</b><b>${t.missing[k] ? "+" : ""}<small>g</small></b><span>/ ${g[k]} g</span></div></section>`,
       )
       .join("")}</div>
 ${Object.values(t.missing).some(Boolean) ? '<p class="partial-notice">Macro values are partial: some logged foods have unknown macros. All calories are included.</p>' : ""}
+<div class="health-readout"><span>${icon("steps")} Steps <b>${Number.isFinite(d.health?.steps) ? num(d.health.steps) : "—"}</b></span><span>${d.health ? "Apple Health · received " + esc(new Date(d.health.syncedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })) : "Connect your iPhone"}</span><button class="textbtn" id="health-connect">${d.health ? "Connection" : "Connect Apple Health"}</button></div>
 <div class="energy-footnote"><span class="status-pulse"></span><span>Your rhythm. Your targets.<small>${num(balance.budget)} kcal budget${balance.burned ? " · includes logged activity" : ""}</small></span><span class="footnote-icon">${icon("goals")}</span></div>
 </section>
 <section class="meal-section" aria-labelledby="meals-heading"><div class="meal-title"><div><span class="eyebrow">ON YOUR PLATE</span><h2 id="meals-heading">Eaten</h2></div><button class="analyze-trigger" id="analyze-meals">${icon("spark")} Analyze ${icon("arrow")}</button></div><div class="meals">${meals
@@ -159,7 +165,7 @@ ${Object.values(t.missing).some(Boolean) ? '<p class="partial-notice">Macro valu
         "",
       )}</div><button class="log-food-row" id="addfood">${icon("plus")} Log something delicious <span>↗</span></button><div class="scan-inline"><div class="scan-inline-symbol">${icon("camera")}</div><div><b>A photo. A starting point.</b><p>AI estimates, reviewed by you.</p></div><button class="textbtn" id="photo" aria-label="Scan meal photo">Scan ${icon("arrow")}</button></div></section>
 </div>
-<div class="support-strip"><section class="hydration-module" id="water-tile"><span class="support-icon">${icon("drop")}</span><div><h2>Stay in your flow.</h2><p><b>${(d.water / 1000).toFixed(2).replace(/0$/, "")} L</b> / ${g.water / 1000} L of water</p></div><div class="water-controls"><button id="waterminus" aria-label="Remove 250 milliliters">−</button><button id="water">${icon("plus")} 250 ml</button></div><div class="water-wave" style="--water-fill:${Math.min(100, (d.water / g.water) * 100)}%"><span></span></div></section><section class="notes-module"><div class="section-head"><h2>${icon("note")} Daily notes</h2><button id="notes" class="textbtn" aria-label="${d.note ? "Edit" : "Add"} daily note">${icon("plus")}</button></div><p>${d.note ? esc(d.note) : "How did today feel? Every detail counts."}</p></section><button class="local-module" id="browse-foods"><span class="eyebrow">A LITTLE MORE LOCAL</span><b>From mate to milanesa.</b><span>Explore Argentine foods ${icon("arrow")}</span></button></div>`;
+<div class="support-strip"><section class="hydration-module" id="water-tile"><span class="support-icon">${icon("drop")}</span><div><h2>Stay in your flow.</h2><p><b>${(d.water / 1000).toFixed(2).replace(/0$/, "")} L</b> / ${g.water / 1000} L of water</p></div><div class="water-controls"><button id="waterminus" aria-label="Remove 250 milliliters">−</button><button id="water">${icon("plus")} 250 ml</button></div><div class="water-wave" style="--water-fill:${Math.min(100, (d.water / g.water) * 100)}%"><span></span></div></section><section class="notes-module"><div class="section-head"><h2>${icon("note")} Daily notes</h2><button id="notes" class="textbtn" aria-label="${d.note ? "Edit" : "Add"} daily note">${icon("plus")}</button></div><p ${d.note ? "data-no-translate" : ""}>${d.note ? esc(d.note) : "How did today feel? Every detail counts."}</p></section><button class="local-module" id="browse-foods"><span class="eyebrow">A LITTLE MORE LOCAL</span><b>From mate to milanesa.</b><span>Explore Argentine foods ${icon("arrow")}</span></button></div>`;
   $("#date").onchange = (e) => {
     if (e.target.value) {
       date = e.target.value;
@@ -204,6 +210,7 @@ ${Object.values(t.missing).some(Boolean) ? '<p class="partial-notice">Macro valu
   $("#photo").onclick = openPhoto;
   $("#analyze-meals").onclick = openPhoto;
   $("#burned").onclick = logActivity;
+  $("#health-connect").onclick = () => openHealthSetup({ modal, toast });
   document.querySelectorAll("[data-day]").forEach(
     (b) =>
       (b.onclick = () => {
@@ -232,14 +239,24 @@ ${Object.values(t.missing).some(Boolean) ? '<p class="partial-notice">Macro valu
 function logActivity() {
   modal(
     "Activity calories",
-    `<p class="notice">Enter your total calories burned from activity for ${esc(date)}. Use an estimate from your watch or activity log. This adds to your daily calorie budget.</p><form id="activityform"><label class="field">Calories burned (kcal)<input id="activity-kcal" type="number" min="0" max="10000" step="1" value="${day().burned || 0}" required></label><button class="solid full">Save activity</button></form>`,
+    `<p class="notice">Enter your total calories burned from activity for ${esc(date)}. Use an estimate from your watch or activity log. Saving selects manual activity for this day. Apple Health active calories replace manual calories; the two are never added together.</p><form id="activityform"><label class="field">Calories burned (kcal)<input id="activity-kcal" type="number" min="0" max="10000" step="1" value="${day().burned || 0}" required></label><button class="solid full">Use manual activity</button></form>${Number.isFinite(day().health?.activeKcal) ? '<button class="textbtn" id="use-health-activity">Use Apple Health active calories</button>' : ""}`,
   );
   $("#activityform").onsubmit = (e) => {
     e.preventDefault();
-    updateDay({ ...day(), burned: Number($("#activity-kcal").value) });
+    updateDay({
+      ...day(),
+      burned: Number($("#activity-kcal").value),
+      activitySource: "manual",
+    });
     $("#modal").close();
     toast("Activity updated. Your energy budget is in sync.");
   };
+  if ($("#use-health-activity"))
+    $("#use-health-activity").onclick = () => {
+      updateDay({ ...day(), activitySource: "health" });
+      $("#modal").close();
+      toast("Using Apple Health active calories for this day");
+    };
 }
 function allFoods() {
   return [...foods, ...state.custom];
@@ -292,7 +309,7 @@ function drawFoods() {
     matching(query, category)
       .map(
         (f) =>
-          `<article class="card food-item"><span class="emoji">${f.emoji}</span><h3>${esc(f.name)}</h3><p>${esc(f.serving)}</p><p>P ${formatMacro(f.p)} &nbsp; C ${formatMacro(f.c)} &nbsp; F ${formatMacro(f.f)}</p><div class="food-bottom"><strong>${f.kcal} <small>kcal</small></strong><button class="plus" data-food="${f.id}" aria-label="Log ${esc(f.name)}">${icon("plus")}</button></div></article>`,
+          `<article class="card food-item"><span class="emoji">${icon(foodIcon(f))}</span><h3>${esc(f.name)}</h3><p>${esc(f.serving)}</p><p>P ${formatMacro(f.p)} &nbsp; C ${formatMacro(f.c)} &nbsp; F ${formatMacro(f.f)}</p><div class="food-bottom"><strong>${f.kcal} <small>kcal</small></strong><button class="plus" data-food="${f.id}" aria-label="Log ${esc(f.name)}">${icon("plus")}</button></div></article>`,
       )
       .join("") ||
     '<div class="empty-state">No foods found. Try a different search or create your own.</div>';
@@ -315,7 +332,7 @@ function openFood(m) {
       matching($("#foodsearch").value)
         .map(
           (f) =>
-            `<div class="result"><span>${f.emoji}</span><span class="result-name">${esc(f.name)}<small>${esc(f.serving)} · ${f.kcal} kcal</small></span><button class="plus" data-pick="${f.id}" aria-label="Choose ${esc(f.name)}">${icon("plus")}</button></div>`,
+            `<div class="result"><span>${icon(foodIcon(f))}</span><span class="result-name">${esc(f.name)}<small>${esc(f.serving)} · ${f.kcal} kcal</small></span><button class="plus" data-pick="${f.id}" aria-label="Choose ${esc(f.name)}">${icon("plus")}</button></div>`,
         )
         .join("") || "<p>No foods found.</p>";
     document
@@ -331,12 +348,12 @@ function openFood(m) {
   draw();
 }
 function mealSelect() {
-  return `<label class="field">Meal<select id="meal">${meals.map((m) => `<option ${m === meal ? "selected" : ""}>${m}</option>`).join("")}</select></label>`;
+  return `<label class="field">Meal<select id="meal">${meals.map((m) => `<option value="${m}" ${m === meal ? "selected" : ""}>${m}</option>`).join("")}</select></label>`;
 }
 function portion(f) {
   if ($("#modal").open) $("#modal").close();
   modal(
-    f.emoji + " " + esc(f.name),
+    icon(foodIcon(f)) + " <span data-no-translate>" + esc(f.name) + "</span>",
     `<p>${esc(f.serving)}</p>${f.source ? `<p class="notice">From your video at ${f.sourceSeconds}s. Calories apply to this entire displayed portion. ${f.grams ? "" : "Weight is unspecified; adjust by multiples of the displayed portion."} ${[f.p, f.c, f.f].some((v) => v === null) ? "Some macros are unknown and will be excluded from macro totals." : "Macros transcribed from the detail screen."}</p>` : ""}<form id="portionform">${mealSelect()}<div class="two"><label class="field">${f.source ? "Multiples of this video portion" : "Number of servings"}<input id="quantity" type="number" min="0.01" max="100" step="0.01" value="1" required></label><label class="field">Total weight (g / ml)<input id="grams" type="number" min="1" max="100000" step="1" value="${f.grams ?? ""}" ${f.grams ? "required" : 'disabled placeholder="Unknown"'}></label></div><p class="notice" id="portiontotal"></p><button class="solid full">Add to diary</button></form>`,
   );
   const calc = () => {
@@ -373,7 +390,8 @@ function addEntry(e) {
     animateDashboard(
       before,
       after,
-      calorieBalance(state.goals.kcal, after.kcal, day().burned).budget,
+      calorieBalance(state.goals.kcal, after.kcal, activityForDay(day()))
+        .budget,
     );
     document
       .querySelector(`[data-meal="${e.meal}"]`)
@@ -500,7 +518,7 @@ function renderProgress() {
     `<div class="grid"><div class="card"><h2>The last 7 days</h2><p style="font-size:11px">Calories logged · daily target ${num(state.goals.kcal)} kcal</p>${dates
       .map((d) => {
         const val = total(state.days[d] || { entries: [] }).kcal;
-        return `<div class="history-row"><span>${new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" })}</span><div class="bar" style="--color:var(--accent)"><i style="width:${Math.min(100, (val / state.goals.kcal) * 100)}%"></i></div><strong>${num(val)} kcal</strong></div>`;
+        return `<div class="history-row"><span>${new Date(d + "T12:00:00Z").toLocaleDateString(currentLocale(), { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" })}</span><div class="bar" style="--color:var(--accent)"><i style="width:${Math.min(100, (val / state.goals.kcal) * 100)}%"></i></div><strong>${num(val)} kcal</strong></div>`;
       })
       .join(
         "",
@@ -880,6 +898,7 @@ $(".brand").onclick = (e) => {
 };
 hydrateIcons();
 initTheme();
+initLanguage(() => render());
 render();
 
 diarySync = createDiarySync({
@@ -932,3 +951,50 @@ setInterval(() => {
   if (!document.hidden) diarySync.sync();
 }, 60000);
 diarySync.sync();
+
+$("#modal").addEventListener("close", () => diarySync.sync());
+
+document.addEventListener("focusout", () => {
+  setTimeout(() => {
+    if (
+      !$("#modal").open &&
+      !document.activeElement?.matches("input, textarea, select")
+    )
+      diarySync.sync();
+  }, 0);
+});
+
+$("#check-storage").onclick = async () => {
+  modal(
+    "Cloud connection",
+    `<p id="storage-report" role="status">Checking database read and write access…</p><p class="notice">This check uses a temporary test key. Your diary entries are not changed.</p>`,
+  );
+  try {
+    const response = await fetch("/api/storage-status", {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+    const data = await response.json();
+    const target = $("#storage-report");
+    if (!target) return;
+    if (response.status === 401) {
+      target.innerHTML = `<a href="/api/auth">Sign in to sync</a>`;
+      return;
+    }
+    if (response.status === 503) {
+      target.textContent =
+        "Cloud database is not configured. Connect Upstash to Production and redeploy.";
+      return;
+    }
+    if (!response.ok || !data.ok) {
+      target.textContent = `Database check failed (HTTP ${response.status}). Check the Upstash connection and server credentials in Vercel.`;
+      return;
+    }
+    target.textContent = `Database read and write: OK. Saved days: ${data.days}. Revision: ${data.revision}.`;
+  } catch {
+    if ($("#storage-report"))
+      $("#storage-report").textContent =
+        "Could not reach the database check. Retry when connected.";
+  }
+};

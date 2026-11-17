@@ -24,8 +24,28 @@ const paths = {
   dinner: '<path d="M18 3a9 9 0 1 0 3 15A9 9 0 0 1 18 3Z"/>',
   note: '<path d="M14 3H4v18h16V9ZM14 3v6h6M8 13h8M8 17h5"/>',
   bolt: '<path d="m13 2-9 12h7l-1 8 10-13h-7Z"/>',
+  leaf: '<path d="M5 20c0-9 5-15 15-15 0 10-5 15-12 15M5 20 16 9"/><path d="m11 14 1-6m-1 6 6-1"/>',
+  grain:
+    '<path d="M5 21 19 3M10 15c-5 0-6-4-5-7 4 0 7 3 5 7Zm0 0c0-5 4-7 7-6 0 4-3 7-7 6ZM15 9c-4 0-5-4-4-7 4 1 6 3 4 7Z"/>',
+  protein:
+    '<path d="M4 14c0-5 5-11 11-10 7 1 6 10 2 13-3 3-9 5-12 2-1-1-1-3-1-5Z"/><path d="M8 15c-1-4 4-8 7-7s3 5 0 7-6 3-7 0Z"/>',
+  fruit:
+    '<path d="M12 8C5 3 0 12 6 19c2 3 4 1 6 1s4 2 6-1c6-7 1-16-6-11Z"/><path d="M12 8c-2-4 0-6 3-7m-2 4c2-3 5-3 7-2-1 3-4 4-7 2Z"/>',
+  mate: '<path d="M6 8h12l2 6c2 8-18 8-16 0ZM7 8c0-4 10-4 10 0M13 8l2-6h4"/><path d="M6 13c3 2 9 2 12 0"/>',
+  steps:
+    '<path d="M8 3c3 0 4 5 4 8s-2 4-4 3-3-4-3-6 1-5 3-5Zm8 7c2 0 3 5 3 7s-2 3-4 3-3-2-2-4 1-6 3-6Z"/>',
+  plate:
+    '<circle cx="13" cy="12" r="8"/><circle cx="13" cy="12" r="4"/><path d="M2 3v5m2-5v5M2 8h2M3 8v13"/>',
   close: '<path d="m6 6 12 12M6 18 18 6"/>',
 };
+export function foodIcon(food) {
+  const category = (food.category || "").toLowerCase();
+  if (category.includes("drink")) return "mate";
+  if (category.includes("fruit")) return "fruit";
+  if (category.includes("protein")) return "protein";
+  if (category.includes("video")) return "grain";
+  return "plate";
+}
 export function icon(name, cls = "") {
   return `<svg class="svg-icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.spark}</svg>`;
 }
@@ -50,8 +70,8 @@ export function initTheme() {
     );
     button.setAttribute("aria-pressed", String(dark));
     document.querySelector('meta[name="theme-color"]').content = dark
-      ? "#0c0f13"
-      : "#edf2f4";
+      ? "#151a18"
+      : "#f5f1e8";
   };
   sync();
   button.onclick = () => {
@@ -77,7 +97,7 @@ export function shiftDate(date, delta) {
   value.setUTCDate(value.getUTCDate() + delta);
   return value.toISOString().slice(0, 10);
 }
-export function dateOptions(selected, today) {
+export function dateOptions(selected, today, locale = "en-US") {
   return [-1, 0, 1].map((offset) => {
     const date = shiftDate(selected, offset);
     const label =
@@ -87,7 +107,7 @@ export function dateOptions(selected, today) {
           ? "Yesterday"
           : date === shiftDate(today, 1)
             ? "Tomorrow"
-            : new Date(date + "T12:00:00Z").toLocaleDateString("en-US", {
+            : new Date(date + "T12:00:00Z").toLocaleDateString(locale, {
                 month: "short",
                 day: "numeric",
                 timeZone: "UTC",

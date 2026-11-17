@@ -42,3 +42,11 @@ export function calorieBalance(goal, eaten, burned = 0) {
     progress: Math.min(1, Math.max(0, eaten / budget)),
   };
 }
+
+// Health active energy is an alternative to manual activity, never an extra allowance.
+export function activityForDay(day) {
+  return day.activitySource !== "manual" &&
+    Number.isFinite(day.health?.activeKcal)
+    ? day.health.activeKcal
+    : day.burned;
+}

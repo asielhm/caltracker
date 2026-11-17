@@ -3,13 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#0c0f13" />
+    <meta name="theme-color" content="#151a18" />
     <meta name="color-scheme" content="dark light" />
     <meta
       name="description"
       content="NutriAR. Your daily nutrition, in focus."
     />
-    <title>NutriAR · My Diary</title>
+    <title>NutriAR · Nutrition, at your pace</title>
+    <link rel="icon" href="/assets/brand/mark.svg" type="image/svg+xml" />
+    <link rel="alternate icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/assets/brand/apple-touch-icon.png" />
     <script>
       try {
         document.documentElement.dataset.theme =
@@ -21,10 +24,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Fraunces:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="brand.css" />
   </head>
   <body>
     <a class="skip-link" href="#app">Skip to content</a>
@@ -32,15 +36,27 @@
     <main>
       <header class="topbar">
         <a class="brand" href="#" aria-label="NutriAR diary"
-          ><span class="brand-symbol">n<span>↗</span></span
-          ><span
+          ><img
+            class="brand-mark"
+            src="/assets/brand/mark.svg"
+            width="44"
+            height="44"
+            alt=""
+          /><span
             >nutri<span class="brand-end">ar</span
             ><small>DAILY NUTRITION, IN FOCUS.</small></span
           ></a
         >
         <div class="header-actions">
-          <span class="local"><i></i> Your daily diary.</span
-          ><button
+          <a class="about-link" href="/welcome.html">About NutriAR</a
+          ><label class="language-control"
+            ><span class="sr-only">Languages</span
+            ><select id="language-select" aria-label="Languages">
+              <option value="es">ES</option>
+              <option value="en">EN</option>
+            </select></label
+          >
+          <button
             class="icon"
             id="theme-toggle"
             aria-label="Switch to light mode"
@@ -67,7 +83,8 @@
         >
         <a id="sync-signin" href="/api/auth" hidden>Sign in to sync</a>
         <button id="sync-conflict" class="textbtn" hidden>Review copies</button>
-        <button id="sync-now" class="textbtn">Sync now</button>
+        <button id="sync-now" class="textbtn">Sync now</button
+        ><button id="check-storage" class="textbtn">Check cloud</button>
       </div>
       <div id="app" tabindex="-1"></div>
       <footer>

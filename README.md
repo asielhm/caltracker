@@ -24,7 +24,7 @@ Photo uploads are resized in the browser; prepared images are capped at 3 MB to 
 
 ### Current deployment access limitation
 
-The connected Vercel account exposes the **FulFillOS** team. Project creation returned **403: permission denied**, and the Vercel Git connection did not list `caltracker`. No Vercel project was created. Import using an account/team you control, or grant that connection the required team/repository access before retrying. The code and tests are ready; no live Gemini key has been received or tested.
+The live project is deployed at https://caltracker-brown.vercel.app/ through GitHub pushes. The connected Vercel account exposes the **FulFillOS** team but returns 404 for this project/alias, so it cannot inspect the owner’s live environment variables or billing plan. Use the authenticated in-app database check to verify the actual storage connection; never paste keys or passwords into chat.
 
 ## Run locally
 Requires Node 22+. Run `npm ci` to install the server-side Redis client.
@@ -93,3 +93,21 @@ Photo failures show a bracketed diagnostic with the app error code, Gemini HTTP 
 
 ### Temporary Gemini overloads
 For HTTP 500/502/503/504, the backend makes one short retry before trying an alternative model returned by Google's catalog for the same key. Recovery is capped at **four inference attempts total** and shares the existing **45-second deadline**. Authentication, quota, photo-safety and invalid-estimate failures are not automatically retried. A `Retry-After` greater than two seconds prevents immediate retries/failover. Only a successful, validated estimate can reach the review form; failures never create diary entries. A recovered model is cached for five minutes per process.
+
+## Visual identity and languages
+
+The current app uses a warm ink/citrus/peach palette, an optional parchment light theme, Fraunces editorial headings and Manrope/DM Sans UI text. `dist/brand.css` contains the new design tokens and component adjustments. `dist/assets/brand/` contains the original SVG logo/mark, iPhone home-screen icon and locally hosted editorial hero image. `dist/favicon.ico` supplies the fallback browser icon. Matching custom SVG icons render in the diary, food library, macro readouts and welcome page.
+
+The diary stays at `/`; `/welcome.html` is the bilingual introduction. The ES/EN selector remembers a per-device language preference; visible UI text, supported dynamic status strings, dates and number formatting are localized. Translation never rewrites diary values, food names, notes or internal meal/category keys. `dist/i18n.js` owns the English-to-Spanish UI copy. No paid translation service, runtime design plugin or animation subscription is used. Generated artwork is stored in the project and does not require an ongoing service.
+
+## Database connection check
+
+Select **Check cloud / Comprobar nube** in the saving bar. The authenticated, same-origin `POST /api/storage-status` route writes a unique, 60-second temporary key, reads it back, deletes it and reports saved-day count/revision without exposing diary content or credentials. It never edits the diary document. Both `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` and the Marketplace `KV_REST_API_URL` / `KV_REST_API_TOKEN` naming schemes are supported. Missing Production variables require connecting the database and redeploying. A successful deployment is not proof of a working database: confirm the live read/write check after sign-in.
+
+## Apple Health through a personal iPhone Shortcut
+
+Select **Connect Apple Health / Conectar Apple Health** in the diary for the English/Spanish setup guide. Safari cannot read HealthKit. The owner signs in, creates a 90-day connection token, then builds a Shortcut on their iPhone to send daily `date`, `steps` and `activeKcal` values as JSON to `POST /api/health` using a Bearer token. `date` uses the diary’s Buenos Aires calendar. Read only the chosen source’s samples for today, with active energy in kcal; overlapping Watch/iPhone samples must not be summed. Results can differ from Health’s merged aggregate. No-sample results must not be invented as zero.
+
+Tokens are HMAC-signed using the private app password and are restricted to Health imports. They cannot read diary data, log meals, invoke AI or issue more tokens. Changing `APP_PASSWORD` revokes all such tokens. Tokens are shown only when generated, are not persisted by the web app, and must not be shared with another person or included in a public Shortcut. Imports overwrite daily Health totals, retain meals/notes/manual activity and use atomic revision checks against simultaneous browser edits. Active calories replace manual activity in the daily budget unless the user explicitly selects manual activity. Steps are displayed without converting them into an extra calorie allowance. The current Health endpoints are deployed as Vercel Functions; no native iOS app or paid Apple membership is needed for the Shortcut approach.
+
+The Shortcuts automation is configured on the actual iPhone. No signed `.shortcut` download or preconfigured automation is provided. No paid integrations are provisioned by this implementation; use your existing Vercel and Upstash free-tier plans and Google’s free API quota where available. Free-tier limits and current account billing plans remain controlled in those service dashboards.
