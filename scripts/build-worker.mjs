@@ -19,6 +19,7 @@ const files = {
   "video-foods.js": "text/javascript",
   "nutrition.js": "text/javascript",
   "ui.js": "text/javascript",
+  "ai-estimate.js": "text/javascript",
   "health-shortcut.js": "text/javascript",
   "diary-data.js": "text/javascript",
   "diary-sync.js": "text/javascript",

@@ -1,4 +1,10 @@
-import { initLanguage, currentLocale, localize } from "./i18n.js";
+import { fetchMealEstimate } from "./ai-estimate.js";
+import {
+  initLanguage,
+  currentLocale,
+  currentLanguage,
+  localize,
+} from "./i18n.js";
 import { openHealthSetup } from "./health-shortcut.js";
 import { validState, emptyState } from "./diary-data.js";
 import { createDiarySync } from "./diary-sync.js";
@@ -21,6 +27,7 @@ import {
   validNutrients,
   calorieBalance,
   activityForDay,
+  suggestedMeal,
 } from "./nutrition.js";
 import { foods } from "./foods.js";
 const $ = (s) => document.querySelector(s),
@@ -53,7 +60,7 @@ let date = today(),
   view = "diary",
   category = "All",
   query = "",
-  meal = "Breakfast";
+  meal = suggestedMeal();
 const meals = ["Breakfast", "Lunch", "Merienda", "Dinner"];
 const icons = ["coffee", "lunch", "snack", "dinner"];
 let diarySync;
@@ -182,7 +189,7 @@ ${Object.values(t.missing).some(Boolean) ? '<p class="partial-notice">Macro valu
     view = "goals";
     render();
   };
-  $("#addfood").onclick = () => openFood("Breakfast");
+  $("#addfood").onclick = () => openFood();
   document
     .querySelectorAll("[data-meal]")
     .forEach((b) => (b.onclick = () => openFood(b.dataset.meal)));
@@ -319,11 +326,11 @@ function drawFoods() {
           portion(allFoods().find((f) => String(f.id) === b.dataset.food))),
     );
 }
-function openFood(m) {
+function openFood(m = suggestedMeal()) {
   meal = m;
   modal(
     "Log food",
-    `<input id="foodsearch" class="search" placeholder="Search Argentine foods…" aria-label="Search foods"><div class="results" id="results"></div><button id="newfood" class="textbtn full">＋ Create a custom food</button>`,
+    `<div class="meal-choice">${mealSelect()}<p class="notice">Suggested for the current time in Argentina. Change it anytime.</p></div><input id="foodsearch" class="search" placeholder="Search Argentine foods…" aria-label="Search foods"><div class="meal-entry-actions"><button id="estimate-meal" class="solid" type="button">${icon("spark")} Estimate a meal with AI</button><button id="newfood" class="textbtn" type="button">＋ Create a custom food</button></div><div class="results" id="results"></div>`,
   );
   const draw = () => {
     $("#results").innerHTML =
@@ -333,22 +340,85 @@ function openFood(m) {
             `<div class="result"><span>${icon(foodIcon(f))}</span><span class="result-name">${esc(f.name)}<small>${esc(f.serving)} · ${f.kcal} kcal</small></span><button class="plus" data-pick="${f.id}" aria-label="Choose ${esc(f.name)}">${icon("plus")}</button></div>`,
         )
         .join("") || "<p>No foods found.</p>";
-    document
-      .querySelectorAll("[data-pick]")
-      .forEach(
-        (b) =>
-          (b.onclick = () =>
-            portion(allFoods().find((f) => String(f.id) === b.dataset.pick))),
-      );
+    document.querySelectorAll("[data-pick]").forEach(
+      (b) =>
+        (b.onclick = () =>
+          portion(
+            allFoods().find((f) => String(f.id) === b.dataset.pick),
+            meal,
+          )),
+    );
+  };
+  $("#meal").onchange = (event) => {
+    meal = event.target.value;
   };
   $("#foodsearch").oninput = draw;
-  $("#newfood").onclick = customFood;
+  $("#newfood").onclick = () => customFood(meal);
+  $("#estimate-meal").onclick = () => openTextEstimate(meal);
   draw();
+}
+function openTextEstimate(selectedMeal = suggestedMeal()) {
+  meal = selectedMeal;
+  if ($("#modal").open) $("#modal").close();
+  modal(
+    "Estimate a meal with AI",
+    `<p class="notice">Describe the food, amount and cooking method. AI suggests calories and macros; nothing is logged until you confirm.</p><form id="text-estimate-form"><label class="field">Meal details<textarea id="meal-description" rows="3" minlength="3" maxlength="500" placeholder="For example: 2 baked beef empanadas, about 100 g each" required></textarea></label><button id="estimate-text" class="solid full">Suggest calories & macros</button></form><p id="estimate-text-status" role="status"></p><div id="review"></div>`,
+  );
+  let controller,
+    version = 0;
+  $("#modal").addEventListener("close", () => controller?.abort(), {
+    once: true,
+  });
+  $("#meal-description").oninput = () => {
+    version++;
+    controller?.abort();
+    $("#review").replaceChildren();
+    $("#estimate-text-status").textContent = "";
+    $("#estimate-text").disabled = false;
+  };
+  $("#text-estimate-form").onsubmit = async (event) => {
+    event.preventDefault();
+    controller?.abort();
+    controller = new AbortController();
+    const run = ++version;
+    const button = $("#estimate-text"),
+      status = $("#estimate-text-status");
+    button.disabled = true;
+    status.textContent = "Estimating this meal…";
+    $("#review").replaceChildren();
+    try {
+      const data = await fetchMealEstimate(
+        $("#meal-description").value.trim(),
+        { language: currentLanguage(), signal: controller.signal },
+      );
+      if (run !== version || !$("#text-estimate-form")) return;
+      status.textContent =
+        "Review the suggestion and choose the meal before logging.";
+      reviewPhoto(data, true);
+    } catch (error) {
+      if (
+        run === version &&
+        status.isConnected &&
+        error.name !== "AbortError"
+      ) {
+        status.textContent = error.message;
+        if (error.status === 401) {
+          const link = document.createElement("a");
+          link.href = "/api/auth";
+          link.textContent = "Sign in";
+          status.append(" ", link);
+        }
+      }
+    } finally {
+      if (run === version && button.isConnected) button.disabled = false;
+    }
+  };
 }
 function mealSelect() {
   return `<label class="field">Meal<select id="meal">${meals.map((m) => `<option value="${m}" ${m === meal ? "selected" : ""}>${m}</option>`).join("")}</select></label>`;
 }
-function portion(f) {
+function portion(f, selectedMeal = suggestedMeal()) {
+  meal = selectedMeal;
   if ($("#modal").open) $("#modal").close();
   modal(
     icon(foodIcon(f)) + " <span data-no-translate>" + esc(f.name) + "</span>",
@@ -412,11 +482,12 @@ function addEntry(e) {
     );
   }
 }
-function customFood() {
+function customFood(selectedMeal) {
+  meal = typeof selectedMeal === "string" ? selectedMeal : suggestedMeal();
   if ($("#modal").open) $("#modal").close();
   modal(
     "Create a food",
-    `<form id="customform"><label class="field">Food name<input id="name" maxlength="100" required></label><label class="field">Serving description<input id="serving" placeholder="1 slice · 50 g" maxlength="100" required></label><div class="two">${[
+    `<form id="customform"><label class="field">Food name<input id="name" maxlength="100" required></label><label class="field">Serving description<input id="serving" placeholder="1 slice · 50 g" maxlength="100" required></label><div class="ai-food-assist"><button id="suggest-food" class="textbtn" type="button">${icon("spark")} Suggest calories & macros</button><p class="notice">Enter a food name and serving first. AI suggestions are estimates for that serving, not label values.</p><div id="food-suggestion" role="status"></div></div><div class="two">${[
       ["grams", "Serving weight (g / ml)"],
       ["kcal", "Calories (kcal)"],
       ["p", "Protein (g)"],
@@ -429,6 +500,68 @@ function customFood() {
       )
       .join("")}</div><button class="solid full">Save food</button></form>`,
   );
+  let foodController,
+    foodVersion = 0;
+  const context = () =>
+    `${$("#name").value.trim()}. Serving: ${$("#serving").value.trim()}.${$("#grams").value ? " Serving weight: " + $("#grams").value + " g/ml." : " Weight not supplied."}`;
+  const invalidate = () => {
+    foodVersion++;
+    foodController?.abort();
+    $("#food-suggestion").replaceChildren();
+    $("#suggest-food").disabled = false;
+  };
+  for (const id of ["name", "serving", "grams"])
+    $("#" + id).addEventListener("input", invalidate);
+  $("#modal").addEventListener("close", () => foodController?.abort(), {
+    once: true,
+  });
+  $("#suggest-food").onclick = async () => {
+    if (!$("#name").value.trim() || !$("#serving").value.trim()) {
+      toast("Enter the food name and serving first.");
+      return;
+    }
+    foodController?.abort();
+    foodController = new AbortController();
+    const run = ++foodVersion,
+      description = context(),
+      controller = foodController;
+    $("#suggest-food").disabled = true;
+    $("#food-suggestion").textContent = "Estimating this serving…";
+    try {
+      const data = await fetchMealEstimate(description, {
+        language: currentLanguage(),
+        signal: controller.signal,
+      });
+      if (run !== foodVersion || !$("#customform") || description !== context())
+        return;
+      $("#food-suggestion").innerHTML =
+        `<p><b>${num(data.kcal)} kcal</b> · ${esc(data.p)} g P · ${esc(data.c)} g C · ${esc(data.f)} g F</p><p>Confidence: ${esc(data.confidence)}</p><ul>${data.assumptions.map((a) => `<li>${esc(a)}</li>`).join("")}</ul><p class="notice">Review this estimate. Enter the serving weight yourself; no weight is invented.</p><button id="apply-food-suggestion" class="solid" type="button">Use suggestion</button>`;
+      $("#apply-food-suggestion").onclick = () => {
+        if (description !== context()) return;
+        for (const key of ["kcal", "p", "c", "f"])
+          $("#" + key).value = Math.round(data[key] * 10) / 10;
+        $("#food-suggestion").textContent =
+          "Suggestion applied. You can edit every value before saving.";
+      };
+    } catch (error) {
+      if (
+        run === foodVersion &&
+        $("#food-suggestion") &&
+        error.name !== "AbortError"
+      ) {
+        $("#food-suggestion").textContent = error.message;
+        if (error.status === 401) {
+          const link = document.createElement("a");
+          link.href = "/api/auth";
+          link.textContent = "Sign in";
+          $("#food-suggestion").append(" ", link);
+        }
+      }
+    } finally {
+      if (run === foodVersion && $("#suggest-food"))
+        $("#suggest-food").disabled = false;
+    }
+  };
   $("#customform").onsubmit = (e) => {
     e.preventDefault();
     const f = {
@@ -444,7 +577,7 @@ function customFood() {
     save();
     $("#modal").close();
     render();
-    portion(f);
+    portion(f, meal);
   };
 }
 function renderGoals() {
@@ -594,6 +727,7 @@ async function prepareMealPhoto(file) {
   }
 }
 async function openPhoto() {
+  meal = suggestedMeal();
   modal(
     "Scan your meal",
     `<p style="font-size:12px">Photograph the whole plate in good light. Add portion details for a better estimate, then review before logging.</p><div class="photo-actions"><button class="solid" id="takephoto" type="button">${icon("camera")} Take photo</button><button class="upload-photo" id="uploadphoto" type="button">${icon("plus")} Upload photo</button></div><input type="file" id="photofile" accept="image/jpeg,image/png,image/webp" hidden><input type="file" id="camerafile" accept="image/*" capture="environment" hidden><section id="camera-preview" class="camera-preview" hidden><video id="camera-video" autoplay muted playsinline aria-label="Rear camera preview"></video><p id="camera-status" role="status">Opening your camera…</p><div class="camera-controls"><button class="solid" id="capturephoto" type="button">Take this photo</button><button id="closecamera" class="textbtn" type="button">Close camera</button></div></section><button id="nativecamera" type="button" class="textbtn" hidden>Use phone camera instead</button><label class="field">Meal details (optional)<textarea id="photonotes" class="search" rows="2" maxlength="500" placeholder="For example: 2 baked beef empanadas, about 100 g each"></textarea></label><p class="notice" id="photostatus" role="status">Checking photo analysis…</p><div id="photocontent"></div><p id="photoerror" role="alert" class="photo-error" hidden></p>`,
@@ -887,7 +1021,7 @@ $("#export").onclick = exportData;
 $("#modal").addEventListener("click", (e) => {
   if (e.target === $("#modal")) $("#modal").close();
 });
-$("#dock-log").onclick = () => openFood("Breakfast");
+$("#dock-log").onclick = () => openFood();
 $(".brand").onclick = (e) => {
   e.preventDefault();
   view = "diary";

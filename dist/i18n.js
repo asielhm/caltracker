@@ -1,5 +1,31 @@
 // UI copy is translated locally. Diary values and user-authored content are never rewritten.
 const es = {
+  "Suggested for the current time in Argentina. Change it anytime.":
+    "Sugerido según la hora actual en Argentina. Podés cambiarlo cuando quieras.",
+  "Estimate a meal with AI": "Estimar una comida con IA",
+  "Suggest calories & macros": "Sugerir calorías y macros",
+  "Enter a food name and serving first. AI suggestions are estimates for that serving, not label values.":
+    "Ingresá el alimento y la porción. La IA estima valores para esa porción; no reemplaza la etiqueta.",
+  "Enter the food name and serving first.":
+    "Primero ingresá el alimento y la porción.",
+  "Estimating this serving…": "Estimando esta porción…",
+  "Estimating this meal…": "Estimando esta comida…",
+  "Review this estimate. Enter the serving weight yourself; no weight is invented.":
+    "Revisá la estimación e ingresá el peso de la porción. No se inventa ningún peso.",
+  "Use suggestion": "Usar sugerencia",
+  "Suggestion applied. You can edit every value before saving.":
+    "Sugerencia aplicada. Podés editar todos los valores antes de guardar.",
+  "Describe the food, amount and cooking method. AI suggests calories and macros; nothing is logged until you confirm.":
+    "Describí el alimento, la cantidad y la preparación. La IA sugiere calorías y macros; nada se registra hasta que confirmes.",
+  "Meal details": "Detalles de la comida",
+  "Review the suggestion and choose the meal before logging.":
+    "Revisá la sugerencia y elegí el momento del día antes de registrar.",
+  "Sign in to use meal estimates.": "Iniciá sesión para estimar comidas.",
+  "The meal could not be estimated. You can enter its nutrition manually.":
+    "No se pudo estimar la comida. Podés ingresar sus valores manualmente.",
+  "Describe the meal and portion in 3–500 characters.":
+    "Describí la comida y la porción en 3 a 500 caracteres.",
+
   "App controls": "Controles de la app",
   "Skip to content": "Saltar al contenido",
   "Your daily diary.": "Tu diario de todos los días.",

@@ -50,3 +50,18 @@ export function activityForDay(day) {
     ? day.health.activeKcal
     : day.burned;
 }
+
+// Defaults use the diary's Argentina timezone, independently of the device timezone.
+export function suggestedMeal(now = new Date()) {
+  const hour = Number(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "America/Argentina/Buenos_Aires",
+      hour: "2-digit",
+      hourCycle: "h23",
+    }).format(now),
+  );
+  if (hour >= 5 && hour < 11) return "Breakfast";
+  if (hour >= 11 && hour < 15) return "Lunch";
+  if (hour >= 15 && hour < 19) return "Merienda";
+  return "Dinner";
+}

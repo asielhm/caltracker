@@ -1052,3 +1052,54 @@ body:not([data-view="diary"]) .intro {
     justify-content: space-between;
   }
 }
+
+.meal-entry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 14px 0 20px;
+}
+.meal-entry-actions .solid {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  font-size: 12px;
+}
+.ai-food-assist {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  margin-bottom: 16px;
+}
+.ai-food-assist > .textbtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 0;
+}
+.ai-food-assist ul {
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+#text-estimate-form textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+#estimate-text-status {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.meal-choice {
+  margin-bottom: 18px;
+}
+.meal-choice .field {
+  margin-bottom: 8px;
+}
