@@ -20,14 +20,14 @@ A responsive calorie and macro diary with 89 Argentine/everyday foods, camera-ba
 
 `api/config.js`, `api/analyze.js` and `api/auth.js` are Vercel Functions; `vercel-api.mjs` provides the password check and forwards requests to the shared Gemini API handler. The paid API fails closed until `APP_PASSWORD` is configured. The static interface contains no key and remains separate from API authentication. To restrict the entire interface too, enable Vercel Deployment Protection for the intended environments.
 
-Photo uploads are resized in the browser; prepared images are capped at 3 MB to fit Vercel's request-body limit after base64 encoding. The API key is never included in a browser request or response, diary state or backups. Diarized foods still live in each browser; server-side AI credentials do not add cross-device diary sync.
+Photo uploads are resized in the browser; prepared images are capped at 3 MB to fit Vercel's request-body limit after base64 encoding. The API key is never included in a browser request or response, diary state or backups. Diary data keeps a browser copy and syncs through the separate authenticated `/api/diary` endpoint when Upstash Redis is connected.
 
 ### Current deployment access limitation
 
 The connected Vercel account exposes the **FulFillOS** team. Project creation returned **403: permission denied**, and the Vercel Git connection did not list `caltracker`. No Vercel project was created. Import using an account/team you control, or grant that connection the required team/repository access before retrying. The code and tests are ready; no live Gemini key has been received or tested.
 
 ## Run locally
-Requires Node 22+. No package dependencies.
+Requires Node 22+. Run `npm ci` to install the server-side Redis client.
 ```
 npm start
 ```
@@ -46,7 +46,7 @@ npm run build:worker
 4. The server calls Google Gemini's generateContent vision API with schema-constrained JSON output. It returns calorie and macro totals, confidence and portion assumptions. Non-food, invalid, refused and incomplete results are rejected.
 5. Review/edit the name and nutrition, choose a meal and explicitly confirm before logging.
 
-Photos are not persisted by NutriAR and are sent to Google Gemini only when Analyze is clicked. Provider handling is governed by the Google AI Studio project's data settings; NutriAR does not request persistent Gemini conversation state; provider retention and processing follow your Google AI Studio project terms. Only the confirmed nutrition estimate is saved in the browser diary. Photo estimates are approximate, particularly for hidden fats and ambiguous portions.
+Photos are not persisted by NutriAR and are sent to Google Gemini only when Analyze is clicked. Provider handling is governed by the Google AI Studio project's data settings; NutriAR does not request persistent Gemini conversation state; provider retention and processing follow your Google AI Studio project terms. Only the confirmed nutrition estimate is saved in the diary, including cloud storage when enabled. Photo estimates are approximate, particularly for hidden fats and ambiguous portions.
 
 ### Server configuration
 Set `GEMINI_API_KEY` privately on the hosting provider. Never put it in client code, GitHub, `.openai/hosting.json`, or a committed `.env`. `GEMINI_MODEL` defaults to `gemini-flash-latest`, a vision/structured-output capable model. The server reports readiness without exposing the key. Valid API access and billing are required. Configure project budgets/usage controls in the Google AI Studio account.
@@ -58,7 +58,18 @@ Set `GEMINI_API_KEY` privately on the hosting provider. Never put it in client c
 The endpoint checks identity (Sites), origin, JSON size, image format/magic bytes and model output. One analysis at a time and 20 attempts/hour are enforced per actor **per process/Worker isolate**. These are best-effort controls, not durable global quotas; restarts and multiple isolates reset or distribute those limits. Use provider project controls for spending limits. Provider calls time out after 45 seconds; the UI supports retry and manual entry.
 
 ## Local diary and food data
-Diary entries, goals and custom foods stay in browser storage. Export/import JSON backups to move between devices. There is no account-based cross-device diary sync.
+Diary entries are keyed by date and retain meals/calories/macros, water, notes and activity. Weight history, custom foods and current goals are also saved. A browser copy remains available while offline; export/import JSON backups remain supported.
+
+### Enable private cross-device saving on Vercel
+
+1. In your **caltracker** Vercel project, open **Storage → Create Database → Upstash Redis** (Marketplace).
+2. Connect the database to the project’s **Production** environment. The integration supplies `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`; keep both server-only. Use a separate database for previews to avoid modifying your real diary from test deployments.
+3. Redeploy, then open the app on the device that already has your entries. Select **Sign in to sync** with username `nutriar` and `APP_PASSWORD`.
+4. Wait for **Saved on this device and in cloud**, then sign in at the same website on your other device. Existing local history migrates automatically; different dates and entry IDs merge. Conflicting edits require an explicit choice and download a backup before either copy is replaced.
+
+The authenticated `/api/diary` Function saves a persistent owner document with atomic revision checks, no expiration, a 2 MB limit, and `private, no-store` responses. Browser refresh, connectivity restoration, returning to the tab, and a visible-tab 60-second refresh trigger sync. Changes sync after a short debounce. Database credentials never enter the browser, backups or source control. This is one personal diary shared by devices using the same owner password; it is not a multi-user account system.
+
+Without a connected database or sign-in, data remains on the device and the status explicitly says so. Do not clear browser data until cloud saving is confirmed or a JSON backup is exported. The legacy Sites Worker does not implement cloud diary storage; this route is supported by the Vercel and password-protected Node hosts.
 
 37 generic starter foods use approximate nutrition per stated serving. 52 foods transcribed from the uploaded video preserve visible calorie values; the two opened detail screens also provide macros. Missing macros/unspecified weights are null, not zero. The diary marks partial macro totals. See [VIDEO-FOODS.md](VIDEO-FOODS.md) for the full transcription. Check package labels for precise nutrition.
 

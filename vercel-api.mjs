@@ -1,10 +1,12 @@
 import { timingSafeEqual } from "node:crypto";
+import { createDiaryHandler } from "./diary-api.mjs";
 import { createApi } from "./api.mjs";
 export function createVercelHandler({
   env = process.env,
   fetchImpl = globalThis.fetch,
 } = {}) {
   const api = createApi({ fetchImpl });
+  const diary = createDiaryHandler({ env });
   return async function handleVercel(request, path) {
     // Fail closed until the owner configures a private app password.
     if (!env.APP_PASSWORD)
@@ -35,6 +37,7 @@ export function createVercelHandler({
           },
         },
       );
+    if (path === "/api/diary") return diary(request);
     if (path === "/api/auth")
       return new Response(null, {
         status: 303,

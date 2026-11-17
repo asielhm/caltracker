@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { timingSafeEqual } from "node:crypto";
 import { Readable } from "node:stream";
+import { createDiaryHandler } from "./diary-api.mjs";
 import { createApi } from "./api.mjs";
 export { validEstimate } from "./api.mjs";
 const root = fileURLToPath(new URL("./dist/", import.meta.url));
@@ -15,6 +16,8 @@ const allowed = new Map([
   ["/video-foods.js", "text/javascript"],
   ["/nutrition.js", "text/javascript"],
   ["/ui.js", "text/javascript"],
+  ["/diary-data.js", "text/javascript"],
+  ["/diary-sync.js", "text/javascript"],
   ["/camera.js", "text/javascript"],
   ["/assets/meal.jpg", "image/jpeg"],
   ["/style.css", "text/css"],
@@ -24,6 +27,7 @@ export function createServer({
   fetchImpl = globalThis.fetch,
 } = {}) {
   const api = createApi({ fetchImpl });
+  const diary = createDiaryHandler({ env });
   return http.createServer(async (req, res) => {
     try {
       if (env.APP_PASSWORD) {
@@ -63,7 +67,17 @@ export function createServer({
             ? {}
             : { body: Readable.toWeb(req), duplex: "half" }),
         });
-        const response = await api(request, env);
+        const response =
+          url.pathname === "/api/diary"
+            ? env.APP_PASSWORD
+              ? await diary(request)
+              : Response.json(
+                  { error: "Configure APP_PASSWORD before cloud saving." },
+                  { status: 503 },
+                )
+            : url.pathname === "/api/auth"
+              ? new Response(null, { status: 303, headers: { Location: "/" } })
+              : await api(request, env);
         res.writeHead(response.status, Object.fromEntries(response.headers));
         res.end(Buffer.from(await response.arrayBuffer()));
         return;

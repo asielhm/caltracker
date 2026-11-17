@@ -2963,3 +2963,30 @@ dialog::backdrop {
 [hidden] {
   display: none !important;
 }
+
+.save-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 10px 0 18px;
+  color: var(--muted, #a6b0bc);
+  font-size: 12px;
+}
+.save-status [hidden] {
+  display: none;
+}
+.save-status a {
+  color: #62eacb;
+}
+.save-status[data-status="saved"] #save-message {
+  color: #69d9b0;
+}
+.save-status[data-status="conflict"] #save-message,
+.save-status[data-status="offline"] #save-message {
+  color: #e8b982;
+}
+.save-status .textbtn {
+  font-size: 12px;
+  padding: 6px 10px;
+}

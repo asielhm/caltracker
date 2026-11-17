@@ -8,6 +8,8 @@ const files = {
   "video-foods.js": "text/javascript",
   "nutrition.js": "text/javascript",
   "ui.js": "text/javascript",
+  "diary-data.js": "text/javascript",
+  "diary-sync.js": "text/javascript",
   "camera.js": "text/javascript",
   "style.css": "text/css",
   "assets/meal.jpg": "image/jpeg",

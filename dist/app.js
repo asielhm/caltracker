@@ -1,3 +1,5 @@
+import { validState, emptyState } from "./diary-data.js";
+import { createDiarySync } from "./diary-sync.js";
 import { openRearCamera, stopCamera, captureCameraPhoto } from "./camera.js";
 import {
   icon,
@@ -41,12 +43,7 @@ let state;
 try {
   state = JSON.parse(localStorage.getItem("nutriar-v1"));
 } catch {}
-state ??= {
-  goals: { kcal: 2000, p: 130, c: 230, f: 62, water: 2000 },
-  days: {},
-  weights: [],
-  custom: [],
-};
+state ??= emptyState();
 state.custom ??= [];
 let date = today(),
   view = "diary",
@@ -55,12 +52,14 @@ let date = today(),
   meal = "Breakfast";
 const meals = ["Breakfast", "Lunch", "Merienda", "Dinner"];
 const icons = ["coffee", "lunch", "snack", "dinner"];
+let diarySync;
 function save() {
   try {
     localStorage.setItem("nutriar-v1", JSON.stringify(state));
   } catch {
     toast("Storage is full. Export your data to keep a backup.");
   }
+  diarySync?.changed();
 }
 function day() {
   return state.days[date] ?? { entries: [], water: 0, note: "" };
@@ -452,7 +451,7 @@ function renderGoals() {
       )
       .join(
         "",
-      )}</div><p id="macroenergy" class="notice">Macro targets provide approximately ${num(g.p * 4 + g.c * 4 + g.f * 9)} kcal. Calories and macros are independently editable.</p><button class="solid">Save my goals</button></form></div><div class="card settings-card" style="margin-top:20px"><h2>Keep your data</h2><p style="font-size:12px">Your diary stays in this browser. Export a backup to move it between devices.</p><button class="solid" id="backup">Export backup</button> <label class="textbtn" style="cursor:pointer">Import backup<input id="import" type="file" accept="application/json" hidden></label></div>`;
+      )}</div><p id="macroenergy" class="notice">Macro targets provide approximately ${num(g.p * 4 + g.c * 4 + g.f * 9)} kcal. Calories and macros are independently editable.</p><button class="solid">Save my goals</button></form></div><div class="card settings-card" style="margin-top:20px"><h2>Keep your data</h2><p style="font-size:12px">Daily meals, water, activity, notes, weight and goals save on this device. Connect cloud saving to keep them available across devices. Check the saving status above; export a backup anytime.</p><button class="solid" id="backup">Export backup</button> <label class="textbtn" style="cursor:pointer">Import backup<input id="import" type="file" accept="application/json" hidden></label></div>`;
   $("#goalsform").onsubmit = (e) => {
     e.preventDefault();
     for (const k of Object.keys(g)) g[k] = Number($("#g-" + k).value);
@@ -474,47 +473,6 @@ function renderGoals() {
       toast("This backup is invalid or unsupported.");
     }
   };
-}
-function validState(s) {
-  return (
-    s.goals &&
-    ["kcal", "p", "c", "f", "water"].every(
-      (k) => Number.isFinite(s.goals[k]) && s.goals[k] > 0,
-    ) &&
-    s.days &&
-    typeof s.days === "object" &&
-    Object.entries(s.days).every(
-      ([d, v]) =>
-        /^\d{4}-\d{2}-\d{2}$/.test(d) &&
-        Array.isArray(v.entries) &&
-        v.entries.every(
-          (e) =>
-            typeof e.id === "string" &&
-            typeof e.name === "string" &&
-            meals.includes(e.meal) &&
-            validNutrients(e),
-        ) &&
-        (v.burned === undefined ||
-          (Number.isFinite(v.burned) && v.burned >= 0 && v.burned <= 10000)) &&
-        Number.isFinite(v.water) &&
-        v.water >= 0 &&
-        typeof v.note === "string",
-    ) &&
-    Array.isArray(s.weights) &&
-    s.weights.every(
-      (w) => typeof w.date === "string" && Number.isFinite(w.kg) && w.kg > 0,
-    ) &&
-    Array.isArray(s.custom) &&
-    s.custom.every(
-      (f) =>
-        typeof f.name === "string" &&
-        typeof f.serving === "string" &&
-        f.grams > 0 &&
-        ["kcal", "p", "c", "f"].every(
-          (k) => Number.isFinite(f[k]) && f[k] >= 0,
-        ),
-    )
-  );
 }
 function exportData() {
   const a = document.createElement("a");
@@ -923,3 +881,54 @@ $(".brand").onclick = (e) => {
 hydrateIcons();
 initTheme();
 render();
+
+diarySync = createDiarySync({
+  getState: () => state,
+  canApply: () =>
+    !$("#modal").open &&
+    !document.activeElement?.matches("input, textarea, select"),
+  applyState: (next) => {
+    if (JSON.stringify(state) === JSON.stringify(next)) return;
+    state = next;
+    try {
+      localStorage.setItem("nutriar-v1", JSON.stringify(state));
+    } catch {
+      toast("Device storage is full. Export a backup.");
+    }
+    if (
+      !$("#modal").open &&
+      !document.activeElement?.matches("input, textarea, select")
+    )
+      render();
+  },
+  onStatus: (kind, message) => {
+    const bar = $("#save-status");
+    bar.dataset.status = kind;
+    $("#save-message").textContent = message;
+    $("#sync-signin").hidden = kind !== "auth";
+    $("#sync-conflict").hidden = kind !== "conflict";
+  },
+});
+$("#sync-now").onclick = () => diarySync.sync();
+$("#sync-conflict").onclick = () => {
+  modal(
+    "Choose your diary copy",
+    `<p>Both devices changed the same data. Export a backup before choosing. The other copy will be replaced.</p><button class="textbtn" id="conflict-backup">Export this device’s backup</button><div class="two"><button class="solid" id="use-cloud">Use cloud copy</button><button class="solid" id="use-local">Use this device’s copy</button></div>`,
+  );
+  $("#conflict-backup").onclick = exportData;
+  for (const source of ["cloud", "local"])
+    $("#use-" + source).onclick = () => {
+      exportData();
+      diarySync.resolve(source);
+      $("#modal").close();
+      render();
+    };
+};
+window.addEventListener("online", () => diarySync.sync());
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) diarySync.sync();
+});
+setInterval(() => {
+  if (!document.hidden) diarySync.sync();
+}, 60000);
+diarySync.sync();
