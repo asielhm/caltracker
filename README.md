@@ -1,34 +1,46 @@
 # NutriAR
-A responsive calorie and macro diary inspired by the supplied Calo screenshots and video. No dependencies; Node 22+ for optional server features.
+A responsive calorie and macro diary with 89 Argentine/everyday foods, camera-based meal estimates, goals, water, notes, activity calories and weight history. Inspired by the supplied Calo video and neon diary mockup.
 
-## Run
+## Run locally
+Requires Node 22+. No package dependencies.
 ```
 npm start
 ```
-Open http://127.0.0.1:3000. `npm run check` validates syntax; `npm test` checks server behavior and food data.
+Open http://127.0.0.1:3000. To use a local untracked `.env`, copy `.env.example`, fill it privately and run `node --env-file=.env server.mjs`.
 
-## Features
-- Daily calorie, protein, carbohydrate and fat totals with editable targets.
-- Breakfast, lunch, merienda and dinner logging; servings or gram adjustments; remove entries.
-- 89 foods: 37 generic Argentine/everyday foods and 52 entries transcribed from your video, searchable with accent-insensitive matching.
-- Custom foods with label values, water tracking, daily notes, weight history and 7-day calorie progress.
-- Local browser persistence with JSON backup export/import. No account or cross-device sync. Empty initial diary; no fabricated user history.
-- Camera/upload flow with editable AI estimates before logging, or manual estimates when AI is unavailable.
+```
+npm run check
+npm test
+npm run build:worker
+```
 
-## Optional AI photo analysis
-The static preview and GitHub Pages cannot run the AI endpoint. Deploy `server.mjs` to a Node host and set `OPENAI_API_KEY` privately in its environment. The app never receives this key. The endpoint uses the OpenAI Chat Completions vision API; set `OPENAI_MODEL` to another compatible vision model if needed. Actual provider calls require a valid key and billing; they have not been tested with live credentials.
+## Photo analysis
+1. Open Analyze or Scan, then take/upload a JPEG, PNG or WebP image up to 8 MB.
+2. Optionally describe quantities, recipe details or cooking oil.
+3. Click Analyze. The browser resizes to at most 1600 px and re-encodes as JPEG, then sends the photo and context to the same-origin `/api/analyze` endpoint.
+4. The server calls OpenAI's Responses vision API with strict structured output and `store: false`. It returns calorie and macro totals, confidence and portion assumptions. Non-food, invalid, refused and incomplete results are rejected.
+5. Review/edit the name and nutrition, choose a meal and explicitly confirm before logging.
 
-For a network host, set `HOST=0.0.0.0`, `APP_PASSWORD` to a strong private password, and `PORT` as required by your host. The username is `nutriar`. Serve over HTTPS. Password authentication protects the app and paid AI endpoint; analysis also checks origin, limits requests per IP, caps upload size, times out requests, and validates model results. In-memory rate limits reset on restart and are not a substitute for shared quotas on multi-instance hosts.
+Photos are not persisted by NutriAR and are sent to OpenAI only when Analyze is clicked. Provider handling is governed by the API project's OpenAI data settings; `store: false` is not a claim of zero provider retention. Only the confirmed nutrition estimate is saved in the browser diary. Photo estimates are approximate, particularly for hidden fats and ambiguous portions.
 
-Images are sent to OpenAI only when Analyze is clicked. Images are not saved by this app, and only the user-confirmed estimate is added to the diary. Do not paste API keys into GitHub or the browser.
+### Server configuration
+Set `OPENAI_API_KEY` privately on the hosting provider. Never put it in client code, GitHub, `.openai/hosting.json`, or a committed `.env`. `OPENAI_MODEL` defaults to `gpt-4.1-mini`, a vision/structured-output capable model. The server reports readiness without exposing the key. Valid API access and billing are required. Configure project budgets/usage controls in the OpenAI account.
 
-## Nutrition data
-`dist/foods.js` contains generic starter estimates per displayed serving, not verified Argentine brand labels or a clinical database. Prepared dishes vary greatly by recipe, edible portion and cooking fat. Values are approximate and calories may differ from simple 4/4/9 arithmetic due to rounding and fiber. Check packaging or a trusted composition database and enter custom foods for precise tracking. The “From your video” category preserves 52 saved entries and their visible calorie values. ISO GOLD and the Union Ganadera milanesa also include the visible macros. These are user-video transcriptions, not verified manufacturer labels. Missing macros and unknown weights are stored as null. Logging these foods adds calories and known macros; the diary flags incomplete macro totals. Only explicitly stated serving weights enable gram scaling. See [VIDEO-FOODS.md](VIDEO-FOODS.md) for the full transcription and timestamps.
+- **Live Sites app:** `scripts/build-worker.mjs` bundles all browser assets and the API into `dist/server/index.js`. Preserve the selected project ID in `.openai/hosting.json` and remove `static` when publishing the Worker. The Sites secret configuration supplies the key at runtime. Site authentication protects the app; paid analysis additionally requires the authenticated visitor header supplied by Sites. The current Site remains owner-private.
+- **Node deployment:** deploy `server.mjs`, `api.mjs` and `dist/`. Set `HOST=0.0.0.0`, `APP_PASSWORD` and the host's `PORT`. Username: `nutriar`. Use HTTPS. If behind an HTTPS proxy, set `PUBLIC_ORIGIN` to the exact public HTTPS origin so origin checks match.
+- **GitHub Pages/static hosting:** serves the diary but cannot execute the API. Use Node or the hosted Worker to enable photo analysis. The included Pages workflow is manual and does not change repository visibility.
 
-## GitHub and hosting
-Push this directory to the selected GitHub repository. All client assets are in `dist/`; any static host can serve them without a build. A GitHub Pages workflow is included; enable Settings → Pages → Source: GitHub Actions. Private repository Pages availability depends on your GitHub plan, and published Pages may be publicly accessible: configure visibility deliberately before enabling it. The workflow is manual so pushing code does not publish health data or change repository visibility. Diaries stay only in each browser, not in GitHub.
+The endpoint checks identity (Sites), origin, JSON size, image format/magic bytes and model output. One analysis at a time and 20 attempts/hour are enforced per actor **per process/Worker isolate**. These are best-effort controls, not durable global quotas; restarts and multiple isolates reset or distribute those limits. Use provider project controls for spending limits. Provider calls time out after 45 seconds; the UI supports retry and manual entry.
 
-For AI, deploy the Node server instead of GitHub Pages. `.openai/hosting.json` is metadata for the separate Sites preview and can be omitted for other hosts.
+## Local diary and food data
+Diary entries, goals and custom foods stay in browser storage. Export/import JSON backups to move between devices. There is no account-based cross-device diary sync.
 
-## Interface and themes
-The In Focus design follows the supplied neon mockup with an obsidian canvas, layered cyan/green calorie meter, unboxed macro readouts, interactive date capsules and a floating action dock. Dark mode is the default; the header toggle remembers an optional light preference. Burned calories can be manually logged and add to the daily energy budget. Logging updates counters and ring layers, with reduced-motion support. See [DESIGN.md](DESIGN.md) for architecture, interactions and verification limits.
+37 generic starter foods use approximate nutrition per stated serving. 52 foods transcribed from the uploaded video preserve visible calorie values; the two opened detail screens also provide macros. Missing macros/unspecified weights are null, not zero. The diary marks partial macro totals. See [VIDEO-FOODS.md](VIDEO-FOODS.md) for the full transcription. Check package labels for precise nutrition.
+
+## Interface
+Dark-first obsidian design, layered calorie meter, unboxed macros, date capsules and floating dock. The theme toggle stores an optional light preference. Activity calories add to the daily energy budget; reduced motion is supported. See [DESIGN.md](DESIGN.md).
+
+## API and verification
+`api.mjs` is shared between Node and Worker, so request validation and provider behavior stay consistent. Tests cover provider request shape with a mocked response, credential failures, refusal/non-food handling, timeouts, quotas, image validation, built Worker asset/API routing and the existing diary calculations. A successful test suite does **not** verify a live provider key. Live photo estimation must be verified after the runtime key is configured.
+
+OpenAI reference: [vision inputs](https://developers.openai.com/api/docs/guides/images-vision) and [structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs).

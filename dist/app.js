@@ -572,64 +572,180 @@ function renderProgress() {
     };
   };
 }
+async function prepareMealPhoto(file) {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type))
+    throw Error(
+      "Choose a JPEG, PNG or WebP photo. Convert HEIC photos to JPEG first.",
+    );
+  if (file.size > 8 * 1024 * 1024)
+    throw Error("Choose a photo smaller than 8 MB.");
+  const url = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+    if (!image.naturalWidth || !image.naturalHeight)
+      throw Error("This image could not be opened.");
+    const scale = Math.min(
+      1,
+      1600 / Math.max(image.naturalWidth, image.naturalHeight),
+    );
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw Error("Photo preparation is unavailable in this browser.");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.88);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 async function openPhoto() {
   modal(
     "Scan your meal",
-    `<p style="font-size:12px">Photograph the whole plate in good light. You'll review and edit the estimate before logging.</p><label class="field">Take or upload a photo<input type="file" id="photofile" accept="image/jpeg,image/png,image/webp" capture="environment"></label><div id="photocontent"></div><p class="notice" id="photostatus">Checking AI availability…</p>`,
+    `<p style="font-size:12px">Photograph the whole plate in good light. Add portion details for a better estimate, then review before logging.</p><label class="field">Take or upload a photo<input type="file" id="photofile" accept="image/jpeg,image/png,image/webp" capture="environment"></label><label class="field">Meal details (optional)<textarea id="photonotes" class="search" rows="2" maxlength="500" placeholder="For example: 2 baked beef empanadas, about 100 g each"></textarea></label><p class="notice" id="photostatus" role="status">Checking photo analysis…</p><div id="photocontent"></div><p id="photoerror" role="alert" class="photo-error" hidden></p>`,
   );
-  let ready = false;
-  try {
-    const r = await fetch("/api/config");
-    const j = await r.json();
-    ready = j.aiEnabled === true;
-  } catch {}
-  if (!$("#photostatus")) return;
-  $("#photostatus").textContent = ready
-    ? "AI is ready. Photos are sent to the configured AI provider only when you select Analyze."
-    : "AI is not configured on this deployment. You can still upload a photo and enter your own estimate. See the GitHub README to enable server-side AI.";
-  $("#photofile").onchange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (file.size > 8 * 1024 * 1024) {
-      toast("Choose an image smaller than 8 MB");
-      return;
-    }
-    const data = await new Promise((resolve) => {
-      const r = new FileReader();
-      r.onload = () => resolve(r.result);
-      r.readAsDataURL(file);
-    });
+  const dialog = $("#modal");
+  let alive = true,
+    ready = false,
+    imageData = null,
+    version = 0,
+    controller;
+  dialog.addEventListener(
+    "close",
+    () => {
+      alive = false;
+      controller?.abort();
+    },
+    { once: true },
+  );
+  const error = (message) => {
+    if (!alive) return;
+    $("#photoerror").textContent = message;
+    $("#photoerror").hidden = !message;
+  };
+  const refresh = () => {
+    if (!alive || !imageData) return;
     $("#photocontent").innerHTML =
-      `<img class="photo-preview" src="${data}" alt="Your meal"><button class="solid full" id="analyze" ${ready ? "" : "disabled"} style="margin-top:15px;opacity:${ready ? 1 : 0.5}">✧ Analyze photo</button><button class="textbtn full" id="manualestimate">Enter an estimate manually</button><div id="review"></div>`;
-    $("#manualestimate").onclick = () =>
+      `<img class="photo-preview" src="${imageData}" alt="Your meal, prepared for analysis"><button class="solid full" id="analyze" ${ready ? "" : "disabled"} style="margin-top:15px">${icon("spark")} Analyze photo</button><p class="photo-privacy">Only Analyze sends your photo and meal details to OpenAI. This app does not save the photo.</p><button class="textbtn full" id="manualestimate">Enter an estimate manually</button><div id="review"></div>`;
+    $("#manualestimate").onclick = () => {
+      version++;
+      controller?.abort();
+      controller = null;
+      const button = $("#analyze");
+      button.disabled = !ready;
+      button.removeAttribute("aria-busy");
+      button.innerHTML = icon("spark") + " Analyze photo";
+      error("");
       reviewPhoto({ name: "My meal", kcal: 0, p: 0, c: 0, f: 0 }, false);
+    };
     $("#analyze").onclick = async () => {
-      const b = $("#analyze");
+      if (!ready || !imageData) return;
+      controller?.abort();
+      controller = new AbortController();
+      const current = controller,
+        currentVersion = version,
+        b = $("#analyze");
       b.disabled = true;
+      b.setAttribute("aria-busy", "true");
       b.textContent = "Analyzing your meal…";
+      error("");
+      $("#review").replaceChildren();
+      const timer = setTimeout(() => current.abort(), 55000);
       try {
-        const r = await fetch("/api/analyze", {
+        const response = await fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: data }),
+          body: JSON.stringify({
+            image: imageData,
+            notes: $("#photonotes").value,
+          }),
+          signal: current.signal,
         });
-        const j = await r.json();
-        if (!r.ok) throw Error(j.error || "Analysis failed");
-        reviewPhoto(j, true);
+        let result;
+        try {
+          result = await response.json();
+        } catch {
+          throw Error(
+            "The server did not return an estimate. Please try again.",
+          );
+        }
+        if (!alive || currentVersion !== version || current !== controller)
+          return;
+        if (!response.ok)
+          throw Error(
+            result.error || "Photo analysis failed. Please try again.",
+          );
+        if (!validNutrients(result) || typeof result.name !== "string")
+          throw Error("The estimate was incomplete. Please try again.");
+        reviewPhoto(result, true);
       } catch (err) {
-        toast(err.message);
+        if (alive && currentVersion === version && current === controller)
+          error(
+            err.name === "AbortError"
+              ? "Analysis was canceled or timed out. You can try again."
+              : err.message,
+          );
       } finally {
-        if ($("#analyze")) {
-          b.disabled = false;
-          b.textContent = "✧ Analyze photo";
+        clearTimeout(timer);
+        if (
+          alive &&
+          currentVersion === version &&
+          current === controller &&
+          b.isConnected
+        ) {
+          b.disabled = !ready;
+          b.removeAttribute("aria-busy");
+          b.innerHTML = icon("spark") + " Analyze again";
         }
       }
     };
   };
+  $("#photofile").onchange = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    controller?.abort();
+    const currentVersion = ++version;
+    imageData = null;
+    error("");
+    $("#photocontent").textContent = "Preparing your photo…";
+    try {
+      const image = await prepareMealPhoto(file);
+      if (!alive || currentVersion !== version) return;
+      imageData = image;
+      refresh();
+    } catch (err) {
+      if (alive && currentVersion === version) {
+        $("#photocontent").replaceChildren();
+        error(err.message || "This photo could not be opened.");
+      }
+    }
+  };
+  try {
+    const response = await fetch("/api/config", {
+      signal: AbortSignal.timeout(10000),
+    });
+    const config = await response.json();
+    if (!alive) return;
+    ready = response.ok && config.aiEnabled === true;
+    $("#photostatus").textContent = ready
+      ? "Photo analysis is ready. Estimates include calories, macros and portion assumptions."
+      : response.status === 401
+        ? "Sign in to use photo analysis."
+        : "Photo analysis is waiting for its server API key. Manual entry is available.";
+  } catch {
+    if (alive)
+      $("#photostatus").textContent =
+        "Photo analysis is temporarily unavailable. You can enter your meal manually.";
+  }
+  if (alive && imageData) refresh();
 }
 function reviewPhoto(data, ai) {
   $("#review").innerHTML =
-    `<p class="notice">${ai ? "AI estimate. Hidden oils and portion sizes can affect accuracy." : "Enter the nutrition for this meal."} Review before adding.</p><form id="reviewform"><label class="field">Meal description<input id="rname" maxlength="100" value="${esc(data.name)}" required></label>${mealSelect()}<div class="two">${[
+    `<p class="notice">${ai ? "AI estimate. Hidden oils and portion sizes can affect accuracy." : "Enter the nutrition for this meal."} Review before adding.</p>${ai && data.confidence ? `<div class="estimate-details"><b>Confidence: ${esc(data.confidence)}</b>${Array.isArray(data.assumptions) && data.assumptions.length ? `<ul>${data.assumptions.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>` : ""}</div>` : ""}<form id="reviewform"><label class="field">Meal description<input id="rname" maxlength="100" value="${esc(data.name)}" required></label>${mealSelect()}<div class="two">${[
       ["kcal", "Calories"],
       ["p", "Protein (g)"],
       ["c", "Carbs (g)"],
