@@ -50,8 +50,11 @@ export function createVercelHandler({
         {
           status: 401,
           headers: {
-            "WWW-Authenticate":
-              'Basic realm="NutriAR photo analysis", charset="UTF-8"',
+            ...(path === "/api/auth"
+              ? {
+                  "WWW-Authenticate": 'Basic realm="NutriAR", charset="UTF-8"',
+                }
+              : {}),
             "Cache-Control": "no-store",
           },
         },

@@ -24,7 +24,7 @@ test("Vercel API requires the app password on every session and works from anoth
     "/api/config",
   );
   assert.equal(anonymous.status, 401);
-  assert.match(anonymous.headers.get("WWW-Authenticate"), /Basic/);
+  assert.equal(anonymous.headers.get("WWW-Authenticate"), null);
   for (let device = 0; device < 2; device++) {
     const response = await handler(
       new Request("https://example.vercel.app/api/config", {
@@ -36,7 +36,7 @@ test("Vercel API requires the app password on every session and works from anoth
     const config = await response.json();
     assert.equal(config.aiEnabled, true);
     assert.equal(config.provider, "Gemini");
-    assert.equal("acceptsUserKey" in config,false);
+    assert.equal("acceptsUserKey" in config, false);
     assert.ok(!JSON.stringify(config).includes("test-key"));
   }
 });
@@ -52,4 +52,25 @@ test("successful browser sign-in redirects back to the app", async () => {
   );
   assert.equal(r.status, 303);
   assert.equal(r.headers.get("Location"), "/");
+});
+
+test("only deliberate sign-in navigation triggers a browser password challenge", async () => {
+  const handler = createVercelHandler({
+    env: { APP_PASSWORD: "private-test-password" },
+  });
+  for (const path of ["/api/diary", "/api/config", "/api/storage-status"]) {
+    const response = await handler(
+      new Request("https://example.vercel.app" + path),
+      path,
+    );
+    assert.equal(response.status, 401);
+    assert.equal(response.headers.get("WWW-Authenticate"), null);
+    assert.equal((await response.json()).signInUrl, "/api/auth");
+  }
+  const signIn = await handler(
+    new Request("https://example.vercel.app/api/auth"),
+    "/api/auth",
+  );
+  assert.equal(signIn.status, 401);
+  assert.match(signIn.headers.get("WWW-Authenticate"), /Basic/);
 });
