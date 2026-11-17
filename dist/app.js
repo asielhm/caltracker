@@ -1,3 +1,4 @@
+import { openRearCamera, stopCamera, captureCameraPhoto } from "./camera.js";
 import {
   icon,
   hydrateIcons,
@@ -573,7 +574,15 @@ function renderProgress() {
   };
 }
 async function prepareMealPhoto(file) {
-  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type))
+  if (
+    ![
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/heic",
+      "image/heif",
+    ].includes(file.type)
+  )
     throw Error(
       "Choose a JPEG, PNG or WebP photo. Convert HEIC photos to JPEG first.",
     );
@@ -613,7 +622,7 @@ async function prepareMealPhoto(file) {
 async function openPhoto() {
   modal(
     "Scan your meal",
-    `<p style="font-size:12px">Photograph the whole plate in good light. Add portion details for a better estimate, then review before logging.</p><label class="field">Take or upload a photo<input type="file" id="photofile" accept="image/jpeg,image/png,image/webp" capture="environment"></label><label class="field">Meal details (optional)<textarea id="photonotes" class="search" rows="2" maxlength="500" placeholder="For example: 2 baked beef empanadas, about 100 g each"></textarea></label><p class="notice" id="photostatus" role="status">Checking photo analysis…</p><div id="photocontent"></div><p id="photoerror" role="alert" class="photo-error" hidden></p>`,
+    `<p style="font-size:12px">Photograph the whole plate in good light. Add portion details for a better estimate, then review before logging.</p><div class="photo-actions"><button class="solid" id="takephoto" type="button">${icon("camera")} Take photo</button><button class="upload-photo" id="uploadphoto" type="button">${icon("plus")} Upload photo</button></div><input type="file" id="photofile" accept="image/jpeg,image/png,image/webp" hidden><input type="file" id="camerafile" accept="image/*" capture="environment" hidden><section id="camera-preview" class="camera-preview" hidden><video id="camera-video" autoplay muted playsinline aria-label="Rear camera preview"></video><p id="camera-status" role="status">Opening your camera…</p><div class="camera-controls"><button class="solid" id="capturephoto" type="button">Take this photo</button><button id="closecamera" class="textbtn" type="button">Close camera</button></div></section><button id="nativecamera" type="button" class="textbtn" hidden>Use phone camera instead</button><label class="field">Meal details (optional)<textarea id="photonotes" class="search" rows="2" maxlength="500" placeholder="For example: 2 baked beef empanadas, about 100 g each"></textarea></label><p class="notice" id="photostatus" role="status">Checking photo analysis…</p><div id="photocontent"></div><p id="photoerror" role="alert" class="photo-error" hidden></p>`,
   );
   const dialog = $("#modal");
   let alive = true,
@@ -621,11 +630,28 @@ async function openPhoto() {
     imageData = null,
     version = 0,
     controller;
+  let cameraStream = null,
+    cameraRun = 0;
+  const closeCamera = () => {
+    cameraRun++;
+    stopCamera(cameraStream);
+    cameraStream = null;
+    const video = $("#camera-video");
+    if (video) video.srcObject = null;
+    const preview = $("#camera-preview");
+    if (preview) preview.hidden = true;
+    const button = $("#takephoto");
+    if (button) {
+      button.disabled = false;
+      button.removeAttribute("aria-busy");
+    }
+  };
   dialog.addEventListener(
     "close",
     () => {
       alive = false;
       controller?.abort();
+      closeCamera();
     },
     { once: true },
   );
@@ -711,8 +737,7 @@ async function openPhoto() {
       }
     };
   };
-  $("#photofile").onchange = async (event) => {
-    const file = event.target.files[0];
+  const handleSelectedPhoto = async (file) => {
     if (!file) return;
     controller?.abort();
     const currentVersion = ++version;
@@ -728,6 +753,81 @@ async function openPhoto() {
       if (alive && currentVersion === version) {
         $("#photocontent").replaceChildren();
         error(err.message || "This photo could not be opened.");
+      }
+    }
+  };
+  $("#photofile").onchange = (event) =>
+    handleSelectedPhoto(event.target.files[0]);
+  $("#camerafile").onchange = (event) =>
+    handleSelectedPhoto(event.target.files[0]);
+  $("#uploadphoto").onclick = () => {
+    closeCamera();
+    $("#photofile").value = "";
+    $("#photofile").click();
+  };
+  $("#nativecamera").onclick = () => {
+    closeCamera();
+    $("#camerafile").value = "";
+    $("#camerafile").click();
+  };
+  $("#closecamera").onclick = closeCamera;
+  $("#takephoto").onclick = async () => {
+    error("");
+    closeCamera();
+    if (!navigator.mediaDevices?.getUserMedia) {
+      $("#camerafile").value = "";
+      $("#camerafile").click();
+      return;
+    }
+    const run = ++cameraRun,
+      button = $("#takephoto");
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+    $("#camera-preview").hidden = false;
+    $("#camera-status").textContent =
+      "Allow camera access to photograph your meal.";
+    $("#capturephoto").disabled = true;
+    try {
+      const stream = await openRearCamera();
+      if (!alive || run !== cameraRun) {
+        stopCamera(stream);
+        return;
+      }
+      cameraStream = stream;
+      const video = $("#camera-video");
+      video.srcObject = stream;
+      await video.play();
+      if (!alive || run !== cameraRun) {
+        stopCamera(stream);
+        return;
+      }
+      $("#capturephoto").disabled = false;
+      $("#camera-status").textContent =
+        "Frame your whole plate, then take the photo.";
+      $("#nativecamera").hidden = false;
+    } catch (err) {
+      if (!alive || run !== cameraRun) return;
+      closeCamera();
+      $("#nativecamera").hidden = false;
+      error(
+        err.name === "NotAllowedError"
+          ? "Camera permission was denied. Allow camera access in your browser settings, or select “Use phone camera instead”."
+          : "The live camera could not open. Select “Use phone camera instead” or upload a photo.",
+      );
+    }
+  };
+  $("#capturephoto").onclick = async () => {
+    const button = $("#capturephoto");
+    button.disabled = true;
+    try {
+      const file = await captureCameraPhoto($("#camera-video"));
+      if (!alive) return;
+      closeCamera();
+      await handleSelectedPhoto(file);
+    } catch (err) {
+      if (alive) {
+        error(err.message);
+        button.disabled = false;
       }
     }
   };

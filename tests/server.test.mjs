@@ -13,6 +13,7 @@ test("serves app and rejects unlisted paths", async () => {
     "/video-foods.js",
     "/nutrition.js",
     "/ui.js",
+    "/camera.js",
     "/assets/meal.jpg",
   ])
     assert.equal((await fetch(url + path)).status, 200);

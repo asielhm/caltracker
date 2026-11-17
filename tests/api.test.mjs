@@ -29,11 +29,10 @@ function req(body = { image }, headers = {}) {
 const completion = (value) =>
   new Response(
     JSON.stringify({
-      status: "completed",
-      steps: [
+      candidates: [
         {
-          type: "model_output",
-          content: [{ type: "text", text: JSON.stringify(value) }],
+          finishReason: "STOP",
+          content: { parts: [{ text: JSON.stringify(value) }] },
         },
       ],
     }),
@@ -85,13 +84,13 @@ test("missing configuration and oversized payloads return actionable errors", as
     400,
   );
 });
-test("sends image and notes to Gemini Interactions API with structured output and storage disabled", async () => {
+test("sends image and notes to Gemini generateContent with inline image data and structured output", async () => {
   let payload;
   const api = createApi({
     fetchImpl: async (url, options) => {
       assert.equal(
         url,
-        "https://generativelanguage.googleapis.com/v1beta/interactions",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
       );
       assert.equal(options.headers["x-goog-api-key"], "test-key");
       payload = JSON.parse(options.body);
@@ -101,10 +100,13 @@ test("sends image and notes to Gemini Interactions API with structured output an
   const r = await api(req({ image, notes: "Two empanadas" }), env);
   assert.equal(r.status, 200);
   assert.deepEqual(await r.json(), { ...estimate, estimated: true });
-  assert.equal(payload.store, false);
-  assert.equal(payload.response_format.mime_type, "application/json");
-  assert.equal(payload.input[1].data, image.split(",")[1]);
-  assert.match(payload.input[0].text, /Two empanadas/);
+  assert.equal("apiKey" in payload, false);
+  assert.equal(payload.generationConfig.responseMimeType, "application/json");
+  assert.equal(
+    payload.contents[0].parts[1].inlineData.data,
+    image.split(",")[1],
+  );
+  assert.match(payload.contents[0].parts[0].text, /Two empanadas/);
 });
 test("non-food photos are rejected rather than logged as zero-calorie meals", async () => {
   const api = createApi({
@@ -189,4 +191,64 @@ test("rejects concurrent analyses for the same actor", async () => {
   assert.equal((await api(req(), env)).status, 429);
   finish();
   assert.equal((await pending).status, 200);
+});
+test("unavailable configured models retry once on the compatible default", async () => {
+  const urls = [];
+  const api = createApi({
+    fetchImpl: async (url) => {
+      urls.push(url);
+      return urls.length === 1
+        ? new Response(JSON.stringify({ error: { status: "NOT_FOUND" } }), {
+            status: 404,
+          })
+        : completion(estimate);
+    },
+  });
+  assert.equal(
+    (await api(req(), { ...env, GEMINI_MODEL: "gemini-unavailable" })).status,
+    200,
+  );
+  assert.equal(urls.length, 2);
+  assert.match(urls[1], /gemini-2\.5-flash:generateContent$/);
+});
+test("unsupported schema options fall back to JSON prompting with server validation", async () => {
+  const bodies = [];
+  const api = createApi({
+    fetchImpl: async (_url, options) => {
+      bodies.push(JSON.parse(options.body));
+      return bodies.length === 1
+        ? new Response(
+            JSON.stringify({
+              error: {
+                message: "Unknown name responseJsonSchema in generationConfig",
+              },
+            }),
+            { status: 400 },
+          )
+        : completion(estimate);
+    },
+  });
+  assert.equal((await api(req(), env)).status, 200);
+  assert.equal(bodies.length, 2);
+  assert.equal(bodies[1].generationConfig.responseJsonSchema, undefined);
+  assert.match(bodies[1].systemInstruction.parts[0].text, /JSON object/);
+});
+test("invalid keys produce an actionable error with no provider message or secret", async () => {
+  const api = createApi({
+    fetchImpl: async () =>
+      new Response(
+        JSON.stringify({
+          error: {
+            message: "bad key test-key",
+            details: [{ reason: "API_KEY_INVALID" }],
+          },
+        }),
+        { status: 400 },
+      ),
+  });
+  const response = await api(req(), env);
+  const data = await response.json();
+  assert.equal(data.code, "INVALID_API_KEY");
+  assert.equal(data.providerStatus, 400);
+  assert.ok(!JSON.stringify(data).includes("test-key"));
 });

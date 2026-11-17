@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.mjs",
     "dev": "node server.mjs",
-    "check": "node --check server.mjs && node --check dist/app.js && node --check dist/foods.js && node --check dist/ui.js && node --check api.mjs && node --check worker/index.mjs && node --check vercel-api.mjs && node --check api/analyze.js && node --check api/config.js && node --check api/auth.js",
+    "check": "node --check server.mjs && node --check dist/app.js && node --check dist/foods.js && node --check dist/ui.js && node --check api.mjs && node --check worker/index.mjs && node --check vercel-api.mjs && node --check api/analyze.js && node --check api/config.js && node --check api/auth.js && node --check dist/camera.js",
     "test": "node --test tests/*.test.mjs",
     "build:worker": "node scripts/build-worker.mjs"
   },

@@ -2898,3 +2898,68 @@ dialog::backdrop {
   opacity: 0.65;
   cursor: progress;
 }
+.photo-actions {
+  display: flex;
+  gap: 10px;
+  margin: 20px 0;
+}
+.photo-actions > button {
+  flex: 1;
+  min-height: 46px;
+}
+.upload-photo {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-size: 12px;
+  background: var(--glass);
+}
+.upload-photo > .svg-icon {
+  width: 16px;
+  height: 16px;
+}
+.upload-photo:hover {
+  border-color: var(--cyan);
+}
+.camera-preview {
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  overflow: hidden;
+  margin: 17px 0;
+  padding: 12px;
+  background: #080b0f;
+}
+.camera-preview video {
+  width: 100%;
+  max-height: 42dvh;
+  object-fit: contain;
+  background: #000;
+  border-radius: 10px;
+}
+.camera-preview p {
+  font-size: 11px;
+  line-height: 1.6;
+  color: #c8d7df;
+  margin: 12px 2px;
+}
+.camera-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.camera-controls .solid {
+  flex: 1;
+}
+.camera-controls .textbtn {
+  padding: 10px;
+}
+.camera-preview[hidden] {
+  display: none;
+}
+[hidden] {
+  display: none !important;
+}

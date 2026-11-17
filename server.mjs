@@ -15,6 +15,7 @@ const allowed = new Map([
   ["/video-foods.js", "text/javascript"],
   ["/nutrition.js", "text/javascript"],
   ["/ui.js", "text/javascript"],
+  ["/camera.js", "text/javascript"],
   ["/assets/meal.jpg", "image/jpeg"],
   ["/style.css", "text/css"],
 ]);

@@ -13,7 +13,7 @@ A responsive calorie and macro diary with 89 Argentine/everyday foods, camera-ba
    | `GEMINI_API_KEY` | Your Google AI Studio API key |
    | `APP_PASSWORD` | A strong private password for your photo API |
 
-   Optionally set `GEMINI_MODEL`; the default is `gemini-3.8-flash`. Never prefix the key with `NEXT_PUBLIC_` or `VITE_`.
+   Optionally set `GEMINI_MODEL`; the default is `gemini-2.5-flash`. Never prefix the key with `NEXT_PUBLIC_` or `VITE_`.
 5. Deploy. Vercel's Git integration deploys future pushes to `main` automatically. Pull requests/non-production branches get previews according to your Vercel settings.
 6. On any device, open the deployed URL, open **Analyze**, and follow **Sign in** if prompted. Username: **nutriar**. Password: the `APP_PASSWORD` you configured. The Gemini key remains on the server and is shared across sessions; users do not enter or save it in the app.
 7. After setting/changing environment variables, **redeploy** so the running functions receive them.
@@ -40,16 +40,16 @@ npm run build:worker
 ```
 
 ## Photo analysis
-1. Open Analyze or Scan, then take/upload a JPEG, PNG or WebP image up to 8 MB.
+1. Open Analyze or Scan. Select **Take photo** to open the rear-camera preview, allow camera access, and select **Take this photo**. **Use phone camera instead** opens the native mobile capture picker; **Upload photo** opens the photo library. Closing the preview or dialog stops every camera track. Camera access requires HTTPS and browser permission. JPEG/PNG/WebP uploads up to 8 MB are resized before sending.
 2. Optionally describe quantities, recipe details or cooking oil.
 3. Click Analyze. The browser resizes to at most 1600 px and re-encodes as JPEG, then sends the photo and context to the same-origin `/api/analyze` endpoint.
-4. The server calls Google Gemini's Interactions vision API with schema-constrained structured output and `store: false`. It returns calorie and macro totals, confidence and portion assumptions. Non-food, invalid, refused and incomplete results are rejected.
+4. The server calls Google Gemini's generateContent vision API with schema-constrained JSON output. It returns calorie and macro totals, confidence and portion assumptions. Non-food, invalid, refused and incomplete results are rejected.
 5. Review/edit the name and nutrition, choose a meal and explicitly confirm before logging.
 
-Photos are not persisted by NutriAR and are sent to Google Gemini only when Analyze is clicked. Provider handling is governed by the Google AI Studio project's data settings; `store: false` is not a claim of zero provider retention. Only the confirmed nutrition estimate is saved in the browser diary. Photo estimates are approximate, particularly for hidden fats and ambiguous portions.
+Photos are not persisted by NutriAR and are sent to Google Gemini only when Analyze is clicked. Provider handling is governed by the Google AI Studio project's data settings; NutriAR does not request persistent Gemini conversation state; provider retention and processing follow your Google AI Studio project terms. Only the confirmed nutrition estimate is saved in the browser diary. Photo estimates are approximate, particularly for hidden fats and ambiguous portions.
 
 ### Server configuration
-Set `GEMINI_API_KEY` privately on the hosting provider. Never put it in client code, GitHub, `.openai/hosting.json`, or a committed `.env`. `GEMINI_MODEL` defaults to `gemini-3.8-flash`, a vision/structured-output capable model. The server reports readiness without exposing the key. Valid API access and billing are required. Configure project budgets/usage controls in the Google AI Studio account.
+Set `GEMINI_API_KEY` privately on the hosting provider. Never put it in client code, GitHub, `.openai/hosting.json`, or a committed `.env`. `GEMINI_MODEL` defaults to `gemini-2.5-flash`, a vision/structured-output capable model. The server reports readiness without exposing the key. Valid API access and billing are required. Configure project budgets/usage controls in the Google AI Studio account.
 
 - **Live Sites app:** `scripts/build-worker.mjs` bundles all browser assets and the API into `dist/server/index.js`. Preserve the selected project ID in `.openai/hosting.json` and remove `static` when publishing the Worker. The Sites secret configuration supplies the key at runtime. Site authentication protects the app; paid analysis additionally requires the authenticated visitor header supplied by Sites. The current Site remains owner-private.
 - **Node deployment:** deploy `server.mjs`, `api.mjs` and `dist/`. Set `HOST=0.0.0.0`, `APP_PASSWORD` and the host's `PORT`. Username: `nutriar`. Use HTTPS. If behind an HTTPS proxy, set `PUBLIC_ORIGIN` to the exact public HTTPS origin so origin checks match.
@@ -69,3 +69,6 @@ Dark-first obsidian design, layered calorie meter, unboxed macros, date capsules
 `api.mjs` is shared between Node and Worker, so request validation and provider behavior stay consistent. Tests cover provider request shape with a mocked response, credential failures, refusal/non-food handling, timeouts, quotas, image validation, built Worker asset/API routing and the existing diary calculations. A successful test suite does **not** verify a live provider key. Live photo estimation must be verified after the runtime key is configured.
 
 Gemini references: [image inputs](https://aistudio.google.com/docs/image-understanding), [structured outputs](https://aistudio.google.com/docs/structured-output) and [Interactions API](https://aistudio.google.com/docs/interactions-overview).
+
+### Gemini compatibility and diagnostics
+The backend uses `generateContent` with `gemini-2.5-flash` by default. A configured model returning 404 retries once on that default. Unsupported schema configuration retries once with a minimal request and explicit JSON instructions; the same server validation still applies. Google HTTP status is returned as `providerStatus` alongside a specific error code. Server logs contain only status/code, never the key, meal notes, photo, or raw upstream message.
