@@ -13,7 +13,7 @@ const estimate = {
   confidence: "medium",
   assumptions: ["Two baked empanadas, about 100 g each."],
 };
-const env = { OPENAI_API_KEY: "test-key" };
+const env = { GEMINI_API_KEY: "test-key" };
 function req(body = { image }, headers = {}) {
   return new Request("https://nutriar.example/api/analyze", {
     method: "POST",
@@ -30,10 +30,10 @@ const completion = (value) =>
   new Response(
     JSON.stringify({
       status: "completed",
-      output: [
+      steps: [
         {
-          type: "message",
-          content: [{ type: "output_text", text: JSON.stringify(value) }],
+          type: "model_output",
+          content: [{ type: "text", text: JSON.stringify(value) }],
         },
       ],
     }),
@@ -85,12 +85,15 @@ test("missing configuration and oversized payloads return actionable errors", as
     400,
   );
 });
-test("sends image and notes to Responses API with structured output and storage disabled", async () => {
+test("sends image and notes to Gemini Interactions API with structured output and storage disabled", async () => {
   let payload;
   const api = createApi({
     fetchImpl: async (url, options) => {
-      assert.equal(url, "https://api.openai.com/v1/responses");
-      assert.equal(options.headers.Authorization, "Bearer test-key");
+      assert.equal(
+        url,
+        "https://generativelanguage.googleapis.com/v1beta/interactions",
+      );
+      assert.equal(options.headers["x-goog-api-key"], "test-key");
       payload = JSON.parse(options.body);
       return completion(estimate);
     },
@@ -99,9 +102,9 @@ test("sends image and notes to Responses API with structured output and storage 
   assert.equal(r.status, 200);
   assert.deepEqual(await r.json(), { ...estimate, estimated: true });
   assert.equal(payload.store, false);
-  assert.equal(payload.text.format.strict, true);
-  assert.equal(payload.input[0].content[1].image_url, image);
-  assert.match(payload.input[0].content[0].text, /Two empanadas/);
+  assert.equal(payload.response_format.mime_type, "application/json");
+  assert.equal(payload.input[1].data, image.split(",")[1]);
+  assert.match(payload.input[0].text, /Two empanadas/);
 });
 test("non-food photos are rejected rather than logged as zero-calorie meals", async () => {
   const api = createApi({
@@ -127,8 +130,11 @@ test("invalid numbers, unfinished outputs and refusals never reach the diary", a
     new Response(
       JSON.stringify({
         status: "completed",
-        output: [
-          { type: "message", content: [{ type: "refusal", refusal: "No" }] },
+        steps: [
+          {
+            type: "model_output",
+            content: [{ type: "refusal", refusal: "No" }],
+          },
         ],
       }),
     ),

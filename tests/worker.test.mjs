@@ -22,7 +22,7 @@ test("built Worker serves app assets and a real API config route", async () => {
 test("built Worker rejects anonymous paid requests and does not expose server source", async () => {
   const r = await worker.fetch(
     new Request("https://site.example/api/analyze", { method: "POST" }),
-    { OPENAI_API_KEY: "test-key" },
+    { GEMINI_API_KEY: "test-key" },
   );
   assert.equal(r.status, 401);
   for (const path of [

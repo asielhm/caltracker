@@ -1,6 +1,31 @@
 # NutriAR
 A responsive calorie and macro diary with 89 Argentine/everyday foods, camera-based meal estimates, goals, water, notes, activity calories and weight history. Inspired by the supplied Calo video and neon diary mockup.
 
+## Deploy from GitHub to Vercel
+
+1. Open [New Vercel project](https://vercel.com/new) in an account/team where you can create projects.
+2. Import the existing private repository `asielhm/caltracker`. If it is missing, grant **Vercel's GitHub app** access to this repository. ChatGPT's GitHub access is a separate installation.
+3. Keep Framework Preset **Other**, Root Directory **./** and Output Directory **dist**. The committed `vercel.json` supplies the build and function configuration. Use Node 22 or later.
+4. Add these **Secret** environment variables for **Production** (and Preview if you want preview photo analysis):
+
+   | Variable | Value |
+   |---|---|
+   | `GEMINI_API_KEY` | Your Google AI Studio API key |
+   | `APP_PASSWORD` | A strong private password for your photo API |
+
+   Optionally set `GEMINI_MODEL`; the default is `gemini-3.8-flash`. Never prefix the key with `NEXT_PUBLIC_` or `VITE_`.
+5. Deploy. Vercel's Git integration deploys future pushes to `main` automatically. Pull requests/non-production branches get previews according to your Vercel settings.
+6. On any device, open the deployed URL, open **Analyze**, and follow **Sign in** if prompted. Username: **nutriar**. Password: the `APP_PASSWORD` you configured. The Gemini key remains on the server and is shared across sessions; users do not enter or save it in the app.
+7. After setting/changing environment variables, **redeploy** so the running functions receive them.
+
+`api/config.js`, `api/analyze.js` and `api/auth.js` are Vercel Functions; `vercel-api.mjs` provides the password check and forwards requests to the shared Gemini API handler. The paid API fails closed until `APP_PASSWORD` is configured. The static interface contains no key and remains separate from API authentication. To restrict the entire interface too, enable Vercel Deployment Protection for the intended environments.
+
+Photo uploads are resized in the browser; prepared images are capped at 3 MB to fit Vercel's request-body limit after base64 encoding. The API key is never included in a browser request or response, diary state or backups. Diarized foods still live in each browser; server-side AI credentials do not add cross-device diary sync.
+
+### Current deployment access limitation
+
+The connected Vercel account exposes the **FulFillOS** team. Project creation returned **403: permission denied**, and the Vercel Git connection did not list `caltracker`. No Vercel project was created. Import using an account/team you control, or grant that connection the required team/repository access before retrying. The code and tests are ready; no live Gemini key has been received or tested.
+
 ## Run locally
 Requires Node 22+. No package dependencies.
 ```
@@ -18,13 +43,13 @@ npm run build:worker
 1. Open Analyze or Scan, then take/upload a JPEG, PNG or WebP image up to 8 MB.
 2. Optionally describe quantities, recipe details or cooking oil.
 3. Click Analyze. The browser resizes to at most 1600 px and re-encodes as JPEG, then sends the photo and context to the same-origin `/api/analyze` endpoint.
-4. The server calls OpenAI's Responses vision API with strict structured output and `store: false`. It returns calorie and macro totals, confidence and portion assumptions. Non-food, invalid, refused and incomplete results are rejected.
+4. The server calls Google Gemini's Interactions vision API with schema-constrained structured output and `store: false`. It returns calorie and macro totals, confidence and portion assumptions. Non-food, invalid, refused and incomplete results are rejected.
 5. Review/edit the name and nutrition, choose a meal and explicitly confirm before logging.
 
-Photos are not persisted by NutriAR and are sent to OpenAI only when Analyze is clicked. Provider handling is governed by the API project's OpenAI data settings; `store: false` is not a claim of zero provider retention. Only the confirmed nutrition estimate is saved in the browser diary. Photo estimates are approximate, particularly for hidden fats and ambiguous portions.
+Photos are not persisted by NutriAR and are sent to Google Gemini only when Analyze is clicked. Provider handling is governed by the Google AI Studio project's data settings; `store: false` is not a claim of zero provider retention. Only the confirmed nutrition estimate is saved in the browser diary. Photo estimates are approximate, particularly for hidden fats and ambiguous portions.
 
 ### Server configuration
-Set `OPENAI_API_KEY` privately on the hosting provider. Never put it in client code, GitHub, `.openai/hosting.json`, or a committed `.env`. `OPENAI_MODEL` defaults to `gpt-4.1-mini`, a vision/structured-output capable model. The server reports readiness without exposing the key. Valid API access and billing are required. Configure project budgets/usage controls in the OpenAI account.
+Set `GEMINI_API_KEY` privately on the hosting provider. Never put it in client code, GitHub, `.openai/hosting.json`, or a committed `.env`. `GEMINI_MODEL` defaults to `gemini-3.8-flash`, a vision/structured-output capable model. The server reports readiness without exposing the key. Valid API access and billing are required. Configure project budgets/usage controls in the Google AI Studio account.
 
 - **Live Sites app:** `scripts/build-worker.mjs` bundles all browser assets and the API into `dist/server/index.js`. Preserve the selected project ID in `.openai/hosting.json` and remove `static` when publishing the Worker. The Sites secret configuration supplies the key at runtime. Site authentication protects the app; paid analysis additionally requires the authenticated visitor header supplied by Sites. The current Site remains owner-private.
 - **Node deployment:** deploy `server.mjs`, `api.mjs` and `dist/`. Set `HOST=0.0.0.0`, `APP_PASSWORD` and the host's `PORT`. Username: `nutriar`. Use HTTPS. If behind an HTTPS proxy, set `PUBLIC_ORIGIN` to the exact public HTTPS origin so origin checks match.
@@ -43,4 +68,4 @@ Dark-first obsidian design, layered calorie meter, unboxed macros, date capsules
 ## API and verification
 `api.mjs` is shared between Node and Worker, so request validation and provider behavior stay consistent. Tests cover provider request shape with a mocked response, credential failures, refusal/non-food handling, timeouts, quotas, image validation, built Worker asset/API routing and the existing diary calculations. A successful test suite does **not** verify a live provider key. Live photo estimation must be verified after the runtime key is configured.
 
-OpenAI reference: [vision inputs](https://developers.openai.com/api/docs/guides/images-vision) and [structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs).
+Gemini references: [image inputs](https://aistudio.google.com/docs/image-understanding), [structured outputs](https://aistudio.google.com/docs/structured-output) and [Interactions API](https://aistudio.google.com/docs/interactions-overview).

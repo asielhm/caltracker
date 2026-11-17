@@ -598,7 +598,14 @@ async function prepareMealPhoto(file) {
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/jpeg", 0.88);
+    let prepared = canvas.toDataURL("image/jpeg", 0.88);
+    if (prepared.length > 4 * 1024 * 1024)
+      prepared = canvas.toDataURL("image/jpeg", 0.7);
+    if (prepared.length > 4 * 1024 * 1024)
+      throw Error(
+        "The prepared photo is too large. Crop it or choose a smaller photo.",
+      );
+    return prepared;
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -630,7 +637,7 @@ async function openPhoto() {
   const refresh = () => {
     if (!alive || !imageData) return;
     $("#photocontent").innerHTML =
-      `<img class="photo-preview" src="${imageData}" alt="Your meal, prepared for analysis"><button class="solid full" id="analyze" ${ready ? "" : "disabled"} style="margin-top:15px">${icon("spark")} Analyze photo</button><p class="photo-privacy">Only Analyze sends your photo and meal details to OpenAI. This app does not save the photo.</p><button class="textbtn full" id="manualestimate">Enter an estimate manually</button><div id="review"></div>`;
+      `<img class="photo-preview" src="${imageData}" alt="Your meal, prepared for analysis"><button class="solid full" id="analyze" ${ready ? "" : "disabled"} style="margin-top:15px">${icon("spark")} Analyze photo</button><p class="photo-privacy">Only Analyze sends your photo and meal details to Google Gemini. This app does not save the photo.</p><button class="textbtn full" id="manualestimate">Enter an estimate manually</button><div id="review"></div>`;
     $("#manualestimate").onclick = () => {
       version++;
       controller?.abort();
@@ -731,11 +738,17 @@ async function openPhoto() {
     const config = await response.json();
     if (!alive) return;
     ready = response.ok && config.aiEnabled === true;
+    if (response.status === 401) {
+      $("#photostatus").innerHTML =
+        'Sign in once on this device to use photo analysis. <a href="/api/auth">Sign in</a>';
+      if (imageData) refresh();
+      return;
+    }
     $("#photostatus").textContent = ready
-      ? "Photo analysis is ready. Estimates include calories, macros and portion assumptions."
+      ? "Gemini photo analysis is ready. Review the calories, macros and portions before logging."
       : response.status === 401
         ? "Sign in to use photo analysis."
-        : "Photo analysis is waiting for its server API key. Manual entry is available.";
+        : "Photo analysis needs GEMINI_API_KEY configured once in the server environment. Manual entry is available.";
   } catch {
     if (alive)
       $("#photostatus").textContent =
