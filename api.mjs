@@ -138,7 +138,6 @@ export function createApi({
       return json(200, {
         aiEnabled: Boolean(env.GEMINI_API_KEY),
         provider: "Gemini",
-        acceptsUserKey: true,
         maxImageBytes: MAX_IMAGE_BYTES,
         reason: env.GEMINI_API_KEY ? "ready" : "not_configured",
       });

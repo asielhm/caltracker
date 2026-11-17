@@ -36,6 +36,7 @@ test("Vercel API requires the app password on every session and works from anoth
     const config = await response.json();
     assert.equal(config.aiEnabled, true);
     assert.equal(config.provider, "Gemini");
+    assert.equal("acceptsUserKey" in config,false);
     assert.ok(!JSON.stringify(config).includes("test-key"));
   }
 });
