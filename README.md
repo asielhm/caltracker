@@ -29,3 +29,6 @@ Images are sent to OpenAI only when Analyze is clicked. Images are not saved by 
 Push this directory to the selected GitHub repository. All client assets are in `dist/`; any static host can serve them without a build. A GitHub Pages workflow is included; enable Settings → Pages → Source: GitHub Actions. Private repository Pages availability depends on your GitHub plan, and published Pages may be publicly accessible: configure visibility deliberately before enabling it. The workflow is manual so pushing code does not publish health data or change repository visibility. Diaries stay only in each browser, not in GitHub.
 
 For AI, deploy the Node server instead of GitHub Pages. `.openai/hosting.json` is metadata for the separate Sites preview and can be omitted for other hosts.
+
+## Interface and themes
+The Daily Rhythm refresh uses a bento dashboard, a warm parchment light theme and an aubergine dark theme, an editorial type pairing, and locally stored food photography. Toggle the sun/moon button in the header; your choice is remembered. Logging updates counters and the meal card; macro and water target crossings have brief visual feedback. Reduced-motion preferences are respected. See [DESIGN.md](DESIGN.md) for tokens, interaction decisions, file locations, references and validation limits.

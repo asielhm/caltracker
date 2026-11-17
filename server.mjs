@@ -5,7 +5,7 @@ import {join} from 'node:path';
 import {timingSafeEqual} from 'node:crypto';
 export function validEstimate(e){return e&&typeof e.name==='string'&&e.name.length<=200&&['kcal','p','c','f'].every(k=>Number.isFinite(e[k])&&e[k]>=0&&e[k]<=10000)}
 const root=fileURLToPath(new URL('./dist/',import.meta.url));
-const allowed=new Map([['/','text/html'],['/index.html','text/html'],['/app.js','text/javascript'],['/foods.js','text/javascript'],['/video-foods.js','text/javascript'],['/nutrition.js','text/javascript'],['/style.css','text/css']]);
+const allowed=new Map([['/','text/html'],['/index.html','text/html'],['/app.js','text/javascript'],['/foods.js','text/javascript'],['/video-foods.js','text/javascript'],['/nutrition.js','text/javascript'],['/ui.js','text/javascript'],['/assets/meal.jpg','image/jpeg'],['/style.css','text/css']]);
 const limits=new Map();
 export function createServer(){return http.createServer(async(req,res)=>{
 const json=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data))};
@@ -27,7 +27,7 @@ const result=await upstream.json();let estimate;try{estimate=JSON.parse(result.c
 }
 if(req.method!=='GET'&&req.method!=='HEAD')return json(405,{error:'Method not allowed.'});
 if(!allowed.has(path))return json(404,{error:'Not found'});
-const file=join(root,path==='/'?'index.html':path.slice(1));res.writeHead(200,{'Content-Type':allowed.get(path)+'; charset=utf-8','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin'});res.end(req.method==='HEAD'?undefined:await readFile(file));
+const file=join(root,path==='/'?'index.html':path.slice(1));res.writeHead(200,{'Content-Type':allowed.get(path)+(allowed.get(path).startsWith('image/')?'':'; charset=utf-8'),'X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin'});res.end(req.method==='HEAD'?undefined:await readFile(file));
 }catch(err){if(!res.headersSent)json(err.name==='TimeoutError'?504:500,{error:err.name==='TimeoutError'?'Photo analysis timed out. Try again.':'Unable to complete the request.'});else res.end()}
 })}
 if(process.argv[1]===fileURLToPath(import.meta.url)){const arg=k=>{const i=process.argv.indexOf(k);return i<0?undefined:process.argv[i+1]};const port=Number(process.env.PORT||arg('--port')||3000);const host=process.env.HOST||arg('--host')||'127.0.0.1';if(host!=='127.0.0.1'&&!process.env.APP_PASSWORD)throw Error('Set APP_PASSWORD before exposing the AI server to a network.');createServer().listen(port,host,()=>console.log(`NutriAR ready at http://${host}:${port}`))}

@@ -1,3 +1,111 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#23774c"><title>NutriAR · Your daily nutrition</title><link rel="stylesheet" href="style.css"></head><body>
-<aside><a class="brand" href="#">◒ <span>nutri<span class="green">ar</span><small>MAKE EVERY BITE COUNT</small></span></a><div class="workspace">YOUR SPACE</div><nav><button data-view="diary" class="active">▦ <span>My diary</span></button><button data-view="foods">◉ <span>Food library</span><small>AR</small></button><button data-view="progress">↗ <span>My progress</span></button><button data-view="goals">⚑ <span>Goals & settings</span></button></nav><div class="side-note"><span>🇦🇷</span><b>A little more local.</b><p>From your morning mate to Sunday asado. Nutrition for the way you eat.</p></div><div class="profile"><div>A</div><span>Your personal space<small>Saved on this device</small></span></div></aside>
-<main><header><div class="breadcrumb">YOUR NUTRITION, SIMPLIFIED</div><div class="header-actions"><span class="local">● All changes saved locally</span><button class="icon" id="export" title="Export your data">↓</button></div></header><div id="app"></div><footer>Small steps. Better habits. <span>Made for your everyday. 🇦🇷</span></footer></main><dialog id="modal"><div id="modalbody"></div></dialog><div id="toast" role="status"></div><script type="module" src="app.js"></script></body></html>
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f3eee7" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="Your food, your rhythm. An everyday nutrition diary with Argentine favorites."
+    />
+    <title>NutriAR · Find your daily rhythm</title>
+    <script>
+      try {
+        const t = localStorage.getItem("nutriar-theme");
+        document.documentElement.dataset.theme =
+          t === "dark" || t === "light"
+            ? t
+            : matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+      } catch {}
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#app">Skip to content</a>
+    <aside class="sidebar">
+      <a class="brand" href="#" aria-label="NutriAR home"
+        ><span class="brand-symbol" aria-hidden="true">✳</span
+        ><span
+          >nutri<span class="brand-end">ar</span
+          ><small>FIND YOUR DAILY RHYTHM</small></span
+        ></a
+      >
+      <div class="workspace">THE EVERYDAY CLUB</div>
+      <nav aria-label="Main navigation">
+        <button data-view="diary" class="active">
+          <span class="nav-icon" data-icon="diary"></span><span>My diary</span
+          ><span class="nav-dot"></span>
+        </button>
+        <button data-view="foods">
+          <span class="nav-icon" data-icon="foods"></span
+          ><span>Food library</span><small>AR</small>
+        </button>
+        <button data-view="progress">
+          <span class="nav-icon" data-icon="progress"></span
+          ><span>My progress</span>
+        </button>
+        <button data-view="goals">
+          <span class="nav-icon" data-icon="goals"></span><span>My goals</span>
+        </button>
+      </nav>
+      <div class="side-note">
+        <span class="local-stamp">HECHO PARA VOS ↗</span
+        ><b>Good food.<br />Real life.</b>
+        <p>
+          From your morning mate to Sunday asado. Make room for what you love.
+        </p>
+        <span class="stamp-star" aria-hidden="true">✳</span>
+      </div>
+      <div class="profile">
+        <div class="avatar">Y<span></span></div>
+        <span
+          >Your everyday space<small>Just you. At your own pace.</small></span
+        >
+      </div>
+    </aside>
+    <main>
+      <header>
+        <div class="breadcrumb">
+          <span class="online-dot"></span> YOUR DAILY DOSE OF BALANCE
+        </div>
+        <div class="header-actions">
+          <span class="local">Saved on this device</span
+          ><button
+            class="icon theme-toggle"
+            id="theme-toggle"
+            aria-label="Switch to dark mode"
+            aria-pressed="false"
+          ></button
+          ><button
+            class="icon"
+            id="export"
+            title="Export your data"
+            aria-label="Export your data"
+          >
+            <span data-icon="download"></span>
+          </button>
+        </div>
+      </header>
+      <div id="app" tabindex="-1"></div>
+      <footer>
+        <span>MORE LIFE. LESS OVERTHINKING.</span
+        ><span>A little more local. <b>Argentina ↗</b></span>
+      </footer>
+    </main>
+    <dialog id="modal" aria-labelledby="modal-title">
+      <div id="modalbody"></div>
+    </dialog>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <div id="celebration" aria-hidden="true"></div>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
