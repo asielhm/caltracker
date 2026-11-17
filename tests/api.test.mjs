@@ -386,3 +386,113 @@ test("unexpected upstream status strings are never reflected into diagnostic fie
   assert.equal(data.providerCode, null);
   assert.ok(!JSON.stringify(data).includes("test-key"));
 });
+test("a transient overload gets one short retry and can recover without model discovery", async () => {
+  let calls = 0,
+    waits = 0;
+  const api = createApi({
+    sleep: async (ms, signal) => {
+      waits++;
+      assert.ok(ms >= 600);
+      assert.equal(signal.aborted, false);
+    },
+    fetchImpl: async () =>
+      ++calls === 1
+        ? Response.json({ error: { status: "UNAVAILABLE" } }, { status: 503 })
+        : completion(estimate),
+  });
+  assert.equal((await api(req(), env)).status, 200);
+  assert.equal(calls, 2);
+  assert.equal(waits, 1);
+});
+test("persistent overload fails over to an advertised model and caches the recovered model", async () => {
+  const calls = [];
+  const api = createApi({
+    sleep: async () => {},
+    fetchImpl: async (url, options) => {
+      calls.push({ url, method: options.method });
+      if (options.method === "GET")
+        return Response.json({
+          models: [
+            {
+              name: "models/gemini-4-hydrogen",
+              supportedGenerationMethods: ["generateContent"],
+            },
+          ],
+        });
+      return url.includes("gemini-4-hydrogen")
+        ? completion(estimate)
+        : Response.json({ error: { status: "UNAVAILABLE" } }, { status: 503 });
+    },
+  });
+  assert.equal((await api(req(), env)).status, 200);
+  assert.equal(calls.filter((c) => c.method === "POST").length, 3);
+  assert.equal((await api(req(), env)).status, 200);
+  assert.match(calls.at(-1).url, /gemini-4-hydrogen/);
+  assert.equal(calls.filter((c) => c.method === "GET").length, 1);
+});
+test("overload recovery is bounded to four total inference attempts", async () => {
+  let generations = 0;
+  const api = createApi({
+    sleep: async () => {},
+    fetchImpl: async (_url, options) => {
+      if (options.method === "GET")
+        return Response.json({
+          models: [
+            {
+              name: "models/gemini-4-hydrogen",
+              supportedGenerationMethods: ["generateContent"],
+            },
+            {
+              name: "models/gemini-3.8-flash",
+              supportedGenerationMethods: ["generateContent"],
+            },
+          ],
+        });
+      generations++;
+      return Response.json(
+        { error: { status: "UNAVAILABLE" } },
+        { status: 503 },
+      );
+    },
+  });
+  const r = await api(req(), env);
+  const data = await r.json();
+  assert.equal(r.status, 502);
+  assert.equal(data.providerStatus, 503);
+  assert.equal(data.attempts, 4);
+  assert.equal(generations, 4);
+});
+test("a long Retry-After prevents immediate retries and model failover", async () => {
+  let calls = 0;
+  const api = createApi({
+    sleep: async () => {
+      throw Error("Must not sleep");
+    },
+    fetchImpl: async () => {
+      calls++;
+      return Response.json(
+        { error: { status: "UNAVAILABLE" } },
+        { status: 503, headers: { "Retry-After": "60" } },
+      );
+    },
+  });
+  assert.equal((await api(req(), env)).status, 502);
+  assert.equal(calls, 1);
+});
+test("canceling during backoff stops additional inference requests", async () => {
+  let calls = 0;
+  const api = createApi({
+    sleep: async () => {
+      throw new DOMException("Canceled", "AbortError");
+    },
+    fetchImpl: async () => {
+      calls++;
+      return Response.json(
+        { error: { status: "UNAVAILABLE" } },
+        { status: 503 },
+      );
+    },
+  });
+  assert.equal((await api(req(), env)).status, 504);
+  assert.equal(calls, 1);
+});

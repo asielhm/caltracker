@@ -79,3 +79,6 @@ Unsupported schema configuration retries once with a minimal request and explici
 
 ### Photo error diagnostics
 Photo failures show a bracketed diagnostic with the app error code, Gemini HTTP status, a sanitized Google status enum when available, and the failing step (`generation` or `model_catalog`). Share that text when reporting a failure. The backend logs the same safe fields as `gemini_request_failed`; it does not expose raw upstream messages or credentials. A passing mocked test suite does not establish that the deployed project's live Gemini requests succeed.
+
+### Temporary Gemini overloads
+For HTTP 500/502/503/504, the backend makes one short retry before trying an alternative model returned by Google's catalog for the same key. Recovery is capped at **four inference attempts total** and shares the existing **45-second deadline**. Authentication, quota, photo-safety and invalid-estimate failures are not automatically retried. A `Retry-After` greater than two seconds prevents immediate retries/failover. Only a successful, validated estimate can reach the review form; failures never create diary entries. A recovered model is cached for five minutes per process.

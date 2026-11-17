@@ -141,10 +141,29 @@ export function compatibleGeminiModels(models) {
       );
     });
 }
+function waitForRetry(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(signal.reason);
+      return;
+    }
+    const abort = () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", abort);
+      reject(signal.reason);
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", abort);
+      resolve();
+    }, ms);
+    signal.addEventListener("abort", abort, { once: true });
+  });
+}
 export function createApi({
   fetchImpl = globalThis.fetch,
   now = Date.now,
   requireIdentity = false,
+  sleep = waitForRetry,
 } = {}) {
   // Best-effort per-process/isolate controls. Provider project budgets remain the hard spending control.
   let workingModel = null;
@@ -252,8 +271,13 @@ export function createApi({
         request.signal,
         AbortSignal.timeout(45000),
       ]);
-      const send = (model, minimal = false) =>
-        fetchImpl(
+      const MAX_GENERATION_ATTEMPTS = 4;
+      let generationAttempts = 0;
+      const isTransient = (response) =>
+        [500, 502, 503, 504].includes(response.status);
+      const sendOnce = (model, minimal = false) => {
+        generationAttempts++;
+        return fetchImpl(
           `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
           {
             method: "POST",
@@ -294,6 +318,20 @@ export function createApi({
             }),
           },
         );
+      };
+      const send = async (model, minimal = false) => {
+        let response = await sendOnce(model, minimal);
+        const retryAfter = Number(response.headers.get("retry-after"));
+        if (
+          isTransient(response) &&
+          generationAttempts < MAX_GENERATION_ATTEMPTS &&
+          retryAfter <= 2
+        ) {
+          await sleep(Math.max(600, retryAfter * 1000), requestSignal);
+          response = await sendOnce(model, minimal);
+        }
+        return response;
+      };
       let model =
         workingModel?.key === apiKey &&
         workingModel.configured === configuredModel &&
@@ -302,7 +340,13 @@ export function createApi({
           : configuredModel;
       let providerStage = "generation";
       let response = await send(model);
-      if (response.status === 404) {
+      if (
+        response.status === 404 ||
+        (isTransient(response) &&
+          Number(response.headers.get("retry-after")) <= 2)
+      ) {
+        const unavailableGeneration = response;
+        const discoveryAfterOverload = isTransient(response);
         workingModel = null;
         const models = [];
         let pageToken = "";
@@ -319,8 +363,10 @@ export function createApi({
             signal: requestSignal,
           });
           if (!catalog.ok) {
-            response = catalog;
-            providerStage = "model_catalog";
+            response = discoveryAfterOverload ? unavailableGeneration : catalog;
+            providerStage = discoveryAfterOverload
+              ? "generation"
+              : "model_catalog";
             catalogFailed = true;
             break;
           }
@@ -343,7 +389,7 @@ export function createApi({
           const candidates = [...new Set(compatibleGeminiModels(models))]
             .filter((name) => name !== model)
             .slice(0, 2);
-          if (!candidates.length)
+          if (!candidates.length && !discoveryAfterOverload)
             return json(502, {
               error:
                 "Google does not offer another compatible image-understanding model to this API key. Check model access and Generative Language API restrictions in Google AI Studio.",
@@ -351,13 +397,21 @@ export function createApi({
               providerStatus: 404,
             });
           for (const candidate of candidates) {
+            if (generationAttempts >= MAX_GENERATION_ATTEMPTS) break;
             model = candidate;
             response = await send(model);
-            if (response.status !== 404) break;
+            if (
+              response.ok ||
+              (!isTransient(response) && response.status !== 404)
+            )
+              break;
           }
         }
       }
-      if (response.status === 400) {
+      if (
+        response.status === 400 &&
+        generationAttempts < MAX_GENERATION_ATTEMPTS
+      ) {
         let details;
         try {
           details = await response.clone().json();
@@ -407,7 +461,7 @@ export function createApi({
               : "PROVIDER_REQUEST_REJECTED";
           message =
             status === 503
-              ? "Gemini reports service overload. Wait a minute and try again."
+              ? "Gemini is still overloaded after limited recovery attempts. Wait a minute before retrying; your photo has not been logged."
               : status === 500
                 ? "Gemini reported an internal server error. Retry shortly."
                 : status === 502
@@ -440,6 +494,7 @@ export function createApi({
           providerCode,
           stage: providerStage,
           retryable: status >= 500 || status === 429,
+          attempts: generationAttempts,
         });
       }
       let result;
