@@ -336,3 +336,53 @@ test("invalid keys produce an actionable error with no provider message or secre
   assert.equal(data.providerStatus, 400);
   assert.ok(!JSON.stringify(data).includes("test-key"));
 });
+test("transient provider failures expose sanitized status and stage instead of an opaque message", async () => {
+  const api = createApi({
+    fetchImpl: async () =>
+      Response.json(
+        {
+          error: {
+            status: "UNAVAILABLE",
+            message: "sensitive test-key diagnostics",
+          },
+        },
+        { status: 503 },
+      ),
+  });
+  const r = await api(req(), env);
+  const value = await r.json();
+  assert.equal(value.providerStatus, 503);
+  assert.equal(value.providerCode, "UNAVAILABLE");
+  assert.equal(value.stage, "generation");
+  assert.equal(value.retryable, true);
+  assert.equal(value.code, "PROVIDER_UNAVAILABLE");
+  assert.ok(!JSON.stringify(value).includes("test-key"));
+});
+test("catalog failures report the catalog step without pretending a generation was attempted", async () => {
+  const api = createApi({
+    fetchImpl: async (_url, options) =>
+      Response.json(
+        {
+          error: {
+            status: options.method === "GET" ? "UNAVAILABLE" : "NOT_FOUND",
+          },
+        },
+        { status: options.method === "GET" ? 503 : 404 },
+      ),
+  });
+  const r = await api(req(), env);
+  assert.equal((await r.json()).stage, "model_catalog");
+});
+test("unexpected upstream status strings are never reflected into diagnostic fields", async () => {
+  const api = createApi({
+    fetchImpl: async () =>
+      Response.json(
+        { error: { status: "test-key sensitive text" } },
+        { status: 500 },
+      ),
+  });
+  const r = await api(req(), env);
+  const data = await r.json();
+  assert.equal(data.providerCode, null);
+  assert.ok(!JSON.stringify(data).includes("test-key"));
+});

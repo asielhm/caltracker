@@ -708,10 +708,26 @@ async function openPhoto() {
         }
         if (!alive || currentVersion !== version || current !== controller)
           return;
-        if (!response.ok)
+        if (!response.ok) {
+          const details = [
+            typeof result.code === "string" ? result.code : null,
+            Number.isInteger(result.providerStatus)
+              ? "Gemini HTTP " + result.providerStatus
+              : "App HTTP " + response.status,
+            typeof result.providerCode === "string"
+              ? result.providerCode
+              : null,
+            typeof result.stage === "string" ? "step: " + result.stage : null,
+          ]
+            .filter(Boolean)
+            .join(" · ");
           throw Error(
-            result.error || "Photo analysis failed. Please try again.",
+            (result.error || "Photo analysis failed. Please try again.") +
+              " [" +
+              details +
+              "]",
           );
+        }
         if (!validNutrients(result) || typeof result.name !== "string")
           throw Error("The estimate was incomplete. Please try again.");
         reviewPhoto(result, true);

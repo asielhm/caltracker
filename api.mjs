@@ -300,6 +300,7 @@ export function createApi({
         workingModel.expires > now()
           ? workingModel.name
           : configuredModel;
+      let providerStage = "generation";
       let response = await send(model);
       if (response.status === 404) {
         workingModel = null;
@@ -319,6 +320,7 @@ export function createApi({
           });
           if (!catalog.ok) {
             response = catalog;
+            providerStage = "model_catalog";
             catalogFailed = true;
             break;
           }
@@ -399,16 +401,45 @@ export function createApi({
           message =
             "Gemini rejected the image or request format. Try a new JPEG photo. If it repeats, check GEMINI_API_KEY and GEMINI_MODEL in Vercel.";
         } else {
-          message = "Gemini is temporarily unavailable. Try again shortly.";
+          code =
+            status >= 500
+              ? "PROVIDER_UNAVAILABLE"
+              : "PROVIDER_REQUEST_REJECTED";
+          message =
+            status === 503
+              ? "Gemini reports service overload. Wait a minute and try again."
+              : status === 500
+                ? "Gemini reported an internal server error. Retry shortly."
+                : status === 502
+                  ? "The Gemini service returned a gateway error. Retry shortly."
+                  : status === 504
+                    ? "Gemini exceeded its processing deadline. Try a smaller, clearer photo."
+                    : status === 402
+                      ? "Gemini requires billing or credits for this request. Check Google AI Studio billing."
+                      : `Gemini rejected the request with HTTP ${status}. Check the diagnostic code below.`;
         }
+        const rawStatus = providerError?.error?.status;
+        const providerCode =
+          typeof rawStatus === "string" && /^[A-Z_]{1,64}$/.test(rawStatus)
+            ? rawStatus
+            : null;
         // Log only safe diagnostics, never the provider message, key, notes or photo.
         console.warn(
-          JSON.stringify({ event: "gemini_request_failed", status, code }),
+          JSON.stringify({
+            event: "gemini_request_failed",
+            status,
+            code,
+            providerCode,
+            stage: providerStage,
+          }),
         );
         return json(status === 429 ? 429 : 502, {
           error: message,
           code,
           providerStatus: status,
+          providerCode,
+          stage: providerStage,
+          retryable: status >= 500 || status === 429,
         });
       }
       let result;
