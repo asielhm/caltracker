@@ -1,34 +1,41 @@
-# NutriAR — Daily rhythm
+# NutriAR — In focus
 
-## Design analysis and direction
+The supplied neon diary mockup is the structural baseline: diary title, interactive date capsule, daily goal, central energy meter with Eaten and Burned on either side, macro readouts, meal logging, Analyze, and a floating navigation dock.
 
-The earlier interface relied on white cards, small labels and green progress bars. It gave the food library, calories, macros and secondary information almost equal visual weight. The refresh makes the daily diary the primary experience and uses a food/editorial identity rather than a clinical fitness identity.
+## Composition
 
-Patterns considered before implementation:
+Desktop uses one continuous dashboard with a fine vertical boundary between energy and meals. On mobile, the sections flow into a single vertical composition. Calories dominate through scale, contrast and position. Macros are unboxed data readouts with shared alignment, rather than separate cards. Water, notes and the Argentine library form a secondary strip. No phone frame, fake user history, notifications or unsupported meal-plan navigation are included.
 
-- **Bento grids:** use unequal tile sizes to make hierarchy visible. Calories occupy the largest tile, the meal scanner gets photographic contrast, and macros share three smaller tiles. The mobile composition deliberately rearranges the scanner and hydration tile below macros rather than shrinking the desktop layout.
-- **Typography pairings:** Manrope supplies clear numeric forms and tabular figures; Instrument Serif adds personality to short headlines; DM Sans handles UI copy. System and Georgia fallbacks keep the app usable without the remote font service.
-- **Glass:** limit translucency to the mobile navigation and the photographic scan badge. Solid surfaces keep numbers and forms readable.
-- **Organic rhythm:** soft corners, a circular energy dial, a slightly rotated local-food stamp, warm tones and real food photography provide personality without decorative scrolling, heavy 3D libraries or cursor effects.
-- **Purposeful motion:** counter interpolation uses existing and new totals; a meal card briefly highlights after logging. Known macro target crossings and water target crossings trigger a short celebration. The app does not fabricate progress or encourage eating past a calorie target.
+## Color and material
 
-Reference material reviewed: [Awwwards design presentation](https://assets.awwwards.com/assets/files/live-presentation.pdf), [Awwwards Hot Right Now](https://assets.awwwards.com/awards/gallery/2023/07/HOT-RIGHT-NOW-BOOK-2023.pdf), and [WebKit: Responsive Design for Motion](https://webkit.org/blog/7551/responsive-design-for-motion/). These informed the design choices; they are not a claim that this app has won an award.
+Obsidian `#0c0f13`, metallic charcoal surfaces and subtle ambient color form the base. Green `#80f8a6`, cyan `#56e5ed` and violet `#b79bff` distinguish actions and nutrient types. Glass is restricted to the dock, date selection and small controls. The main canvas remains legible and structurally clear without blur. An optional light theme is available; this design starts dark on a fresh visit and stores its preference under `nutriar-neon-theme`.
 
-## Implementation map
+## Meter and motion
 
-- `dist/style.css`: semantic theme tokens, bento layouts, all responsive breakpoints and interaction styling. Main colors: warm parchment, deep aubergine, tangerine, lilac, oat and slate blue.
-- `dist/index.html`: navigation, theme bootstrap before the stylesheet, skip link and persistent shell.
-- `dist/app.js`: dashboard composition and existing app behavior.
-- `dist/ui.js`: inline SVG icons, theme toggle, counter motion and goal feedback. No UI framework or animation dependency.
+The energy meter combines an outer segmented orbit, a static accent arc, a track, a blurred progress layer, a sharp gradient progress layer and an inset central disc. Every progress layer uses the real diary totals. There are no continuously rotating rings, particles or ornament animations.
 
-Light/dark follows system preference on the first visit; the header toggle persists an explicit choice under `nutriar-theme`. It updates accessible labels and browser theme color. Nutrition data and existing browser diary storage retain their original keys.
+Food logging interpolates the numeric totals and both ring layers over 650 ms; the changed meal receives a brief tint. A known macro or water goal crossing produces a single short halo confirmation with a text toast. Hover, focus and pressed states give feedback on the date controls, Analyze, food actions and dock. Reduced-motion preferences disable movement while retaining text and state changes. Animation holds references to its original nodes so switching dates during a transition cannot overwrite another day's display.
 
-Motion uses transform/opacity for entrances and feedback, a short 650 ms numeric transition, and a 1.5 second decorative celebration. `prefers-reduced-motion: reduce` disables animations and smooth scrolling. Goal confirmations remain available as text. Keyboard focus is visible, dialog labeling is explicit, charts have accessible labels, macro meters have values, and partial data stays visibly marked.
+## Function
 
-## Photography
+- Three date pills are based on the currently selected day. Previous/next arrows and a native calendar remain available. Dates are calculated at UTC noon to avoid timezone-boundary drift.
+- Eaten comes from actual diary entries. Burned opens a manual activity-calorie entry. Remaining = daily goal + activity calories − eaten. Activity calories are estimates supplied by the user; no device integration is implied. Legacy diaries without activity values use zero.
+- Analyze and Scan open the existing camera/upload and reviewed-estimate flow. Missing AI credentials remain explicitly indicated.
+- Dock controls navigate to real diary, food library, progress and goals views; the central action opens food logging.
+- The existing 89 foods, unknown macro handling, local persistence and backup import/export remain supported.
 
-Food photo: [Unsplash image](https://images.unsplash.com/photo-1511690743698-d9d85f2fbf38). A locally stored, resized copy is used in `dist/assets/meal.jpg` so image rendering does not depend on a runtime image service.
+## Code
+
+`dist/style.css`: theme tokens, cardless dashboard, SVG meter styling, dock, forms, responsive breakpoints and reduced motion.
+
+`dist/app.js`: composition, diary interactions and activity editing.
+
+`dist/ui.js`: icons, date helpers, persistent theme and feedback.
+
+`dist/nutrition.js`: pure calorie balance and nutrition calculations.
+
+`dist/index.html`: dark-first bootstrap, app shell, action dock and dialog accessibility.
 
 ## Validation
 
-`npm run check` validates JavaScript syntax. `npm test` covers app and asset serving, the food catalog, unknown nutrient handling, theme persistence and accessibility labels, target crossing logic, and reduced-motion counter behavior. The managed preview relay could not open its browser port in this environment, so browser visual QA remains unverified.
+`npm run check` checks JavaScript syntax. `npm test` covers catalog and nutrient behavior, server assets, theme state, first-visit dark mode, date boundaries including leap years, activity-adjusted calorie balance and final counter/ring animation values. The managed preview relay could not open its browser port, so browser visual verification is incomplete.

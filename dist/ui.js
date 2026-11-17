@@ -50,8 +50,8 @@ export function initTheme() {
     );
     button.setAttribute("aria-pressed", String(dark));
     document.querySelector('meta[name="theme-color"]').content = dark
-      ? "#17151d"
-      : "#f3eee7";
+      ? "#0c0f13"
+      : "#edf2f4";
   };
   sync();
   button.onclick = () => {
@@ -59,31 +59,52 @@ export function initTheme() {
       document.documentElement.dataset.theme === "dark" ? "light" : "dark";
     document.documentElement.dataset.theme = theme;
     try {
-      localStorage.setItem("nutriar-theme", theme);
+      localStorage.setItem("nutriar-neon-theme", theme);
     } catch {}
     sync();
   };
 }
 export function celebrate() {
-  const stage = document.querySelector("#celebration");
-  stage.replaceChildren();
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  for (let i = 0; i < 24; i++) {
-    const piece = document.createElement("i");
-    piece.style.cssText = `--x:${Math.round(Math.random() * 100)}vw;--drift:${Math.round(Math.random() * 180 - 90)}px;--delay:${i * 12}ms;--spin:${Math.round(Math.random() * 720)}deg;--particle:${["#ff936d", "#c4adf5", "#cddd96", "#e5b8c1"][i % 4]}`;
-    stage.append(piece);
+  const meter = document.querySelector(".meter-stage");
+  if (meter && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    meter.classList.remove("goal-hit");
+    requestAnimationFrame(() => meter.classList.add("goal-hit"));
+    setTimeout(() => meter.classList.remove("goal-hit"), 1000);
   }
-  setTimeout(() => stage.replaceChildren(), 2000);
+}
+export function shiftDate(date, delta) {
+  const value = new Date(date + "T12:00:00Z");
+  value.setUTCDate(value.getUTCDate() + delta);
+  return value.toISOString().slice(0, 10);
+}
+export function dateOptions(selected, today) {
+  return [-1, 0, 1].map((offset) => {
+    const date = shiftDate(selected, offset);
+    const label =
+      date === today
+        ? "Today"
+        : date === shiftDate(today, -1)
+          ? "Yesterday"
+          : date === shiftDate(today, 1)
+            ? "Tomorrow"
+            : new Date(date + "T12:00:00Z").toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                timeZone: "UTC",
+              });
+    return { date, label, selected: date === selected };
+  });
 }
 export function animateDashboard(before, after, goal) {
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const start = performance.now(),
     duration = 650;
-  const ring = document.querySelector(".energy-ring");
+  const rings = document.querySelectorAll(".energy-ring, .energy-glow");
+  const counters = document.querySelectorAll("[data-count]");
   function tick(now) {
     const progress = Math.min(1, (now - start) / duration),
       ease = 1 - Math.pow(1 - progress, 3);
-    document.querySelectorAll("[data-count]").forEach((el) => {
+    counters.forEach((el) => {
       const key = el.dataset.count;
       const from = key === "left" ? Math.abs(goal - before.kcal) : before[key];
       const to = key === "left" ? Math.abs(goal - after.kcal) : after[key];
@@ -93,15 +114,17 @@ export function animateDashboard(before, after, goal) {
           ? Math.round(value).toLocaleString("en-US")
           : String(Math.round(value * 10) / 10);
     });
-    if (ring)
-      ring.style.strokeDashoffset = String(
-        603.19 *
-          (1 -
-            Math.min(
-              1,
-              (before.kcal + (after.kcal - before.kcal) * ease) / goal,
-            )),
-      );
+    rings.forEach(
+      (ring) =>
+        (ring.style.strokeDashoffset = String(
+          603.19 *
+            (1 -
+              Math.min(
+                1,
+                (before.kcal + (after.kcal - before.kcal) * ease) / goal,
+              )),
+        )),
+    );
     if (progress < 1) requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);

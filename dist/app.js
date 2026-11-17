@@ -5,12 +5,15 @@ import {
   celebrate,
   goalMilestones,
   animateDashboard,
+  dateOptions,
+  shiftDate,
 } from "./ui.js";
 import {
   scaleFood,
   summarize,
   formatMacro,
   validNutrients,
+  calorieBalance,
 } from "./nutrition.js";
 import { foods } from "./foods.js";
 const $ = (s) => document.querySelector(s),
@@ -84,20 +87,30 @@ function modal(title, html) {
   $("#modal").showModal();
 }
 function dateControl() {
-  return `<div class="datebox"><button id="prev" aria-label="Previous day">‹</button><input id="date" type="date" value="${date}" aria-label="Diary date"><button id="next" aria-label="Next day">›</button></div>`;
+  return `<div class="date-navigation"><button class="date-arrow" id="prev" aria-label="Previous day">‹</button><div class="date-capsules">${dateOptions(
+    date,
+    today(),
+  )
+    .map(
+      (d) =>
+        `<button class="date-pill ${d.selected ? "selected" : ""}" data-day="${d.date}" aria-pressed="${d.selected}">${d.label}${d.selected ? '<span aria-hidden="true">›</span>' : ""}</button>`,
+    )
+    .join(
+      "",
+    )}</div><button class="date-arrow" id="next" aria-label="Next day">›</button></div><div class="date-caption"><span>${new Date(date + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" })}</span><label class="date-picker">Choose date<input id="date" type="date" value="${date}" aria-label="Choose diary date"></label></div>`;
 }
 function heading(title, sub, control = "") {
   return `<div class="intro"><div><h1>${title}</h1><p>${sub}</p></div>${control}</div>`;
 }
 function render() {
   document
-    .querySelectorAll("nav button")
+    .querySelectorAll("nav [data-view]")
     .forEach((b) => b.classList.toggle("active", b.dataset.view === view));
   if (view === "diary") renderDiary();
   if (view === "foods") renderFoods();
   if (view === "goals") renderGoals();
   if (view === "progress") renderProgress();
-  document.querySelectorAll("nav button").forEach((b) => {
+  document.querySelectorAll("nav [data-view]").forEach((b) => {
     if (b.dataset.view === view) b.setAttribute("aria-current", "page");
     else b.removeAttribute("aria-current");
   });
@@ -106,48 +119,47 @@ function renderDiary() {
   const d = day(),
     t = total(),
     g = state.goals,
-    left = g.kcal - t.kcal;
-  const dateLabel = new Date(date + "T12:00:00Z").toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    timeZone: "UTC",
-  });
+    balance = calorieBalance(g.kcal, t.kcal, d.burned);
   $("#app").innerHTML =
     heading(
-      "Find your <em>daily rhythm.</em>",
-      "A little intention. A lot of living.",
-      dateControl(),
+      "My <span>Diary</span>",
+      "A little more balance. A little more you.",
+      `<span class="live-label"><i></i> DAILY OVERVIEW</span>`,
     ) +
+    dateControl() +
     `
-<div class="day-heading"><span>${date === today() ? "TODAY" : esc(dateLabel).toUpperCase()}</span><span class="day-line"></span><span>${d.entries.length} FOODS LOGGED</span></div>
-<div class="dashboard-bento">
-<section class="energy-card card" aria-label="Daily calorie overview">
-<div class="section-head"><span class="eyebrow">${icon("bolt")} YOUR DAILY ENERGY</span><button class="textbtn" id="editgoals">Edit goal ${icon("arrow")}</button></div>
-<div class="energy-content"><div class="energy-copy"><span class="energy-label">${left < 0 ? "Above your target" : "Room for good food"}</span><div class="energy-number"><strong data-count="left">${num(Math.abs(left))}</strong><span>kcal ${left < 0 ? "above" : "left"}</span></div><p>Good habits are built<br>one bite at a time.</p><div class="energy-stats"><div><span>Eaten</span><b><span data-count="kcal">${num(t.kcal)}</span> <small>kcal</small></b></div><div><span>Daily target</span><b>${num(g.kcal)} <small>kcal</small></b></div></div></div>
-<div class="energy-orbit"><div class="orbit-track"></div><svg class="energy-dial" viewBox="0 0 220 220" role="img" aria-label="${Math.round((t.kcal / g.kcal) * 100)} percent of calorie target logged"><defs><linearGradient id="energy-gradient" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#ffba8c"/><stop offset="1" stop-color="#ff805c"/></linearGradient></defs><circle class="dial-track" cx="110" cy="110" r="96"/><circle class="energy-ring" cx="110" cy="110" r="96" stroke="url(#energy-gradient)" stroke-dasharray="603.19" stroke-dashoffset="${603.19 * (1 - Math.min(1, t.kcal / g.kcal))}"/></svg><div class="dial-core"><span class="dial-spark">✳</span><b>${Math.round((t.kcal / g.kcal) * 100)}<small>%</small></b><span>of your daily target</span></div><span class="orbit-pill">YOUR PACE. YOUR PLATE.</span></div></div>
-</section>
-<section class="card scan-card" aria-labelledby="scan-heading"><img src="assets/meal.jpg" alt="A colorful bowl of fresh food" class="meal-photo"><div class="scan-shade"></div><div class="scan-top"><span class="glass-badge">${icon("spark")} A LITTLE HELP FROM AI</span><span class="scan-spark">✳</span></div><div class="scan-brackets" aria-hidden="true"><i></i><i></i><i></i><i></i></div><div class="scan-copy"><h2 id="scan-heading">A photo.<br><em>A starting point.</em></h2><p>Snap your plate. Review your estimate.</p><button class="scan-button" id="photo">${icon("camera")} Scan a meal ${icon("arrow")}</button><small>AI estimates · always review portions</small></div></section>
-${[
-  ["p", "Protein", "BUILD & REPAIR", "protein"],
-  ["c", "Carbs", "YOUR EVERYDAY FUEL", "carbs"],
-  ["f", "Fat", "A LITTLE LASTING ENERGY", "fat"],
-]
-  .map(
-    ([k, l, sub, cls]) =>
-      `<section class="card macro-tile ${cls}" aria-label="${l} progress"><div class="section-head"><span class="macro-name"><i></i>${l}</span><span class="macro-percent">${t.missing[k] ? "Partial" : Math.round((t[k] / g[k]) * 100) + "%"}</span></div><div class="macro-value"><b data-count="${k}">${Math.round(t[k] * 10) / 10}</b>${t.missing[k] ? '<b class="partial-plus">+</b>' : ""}<span> / ${g[k]} g</span></div><div class="macro-meter" role="progressbar" aria-label="${l}${t.missing[k] ? " (known amounts only)" : ""}" aria-valuemin="0" aria-valuemax="${g[k]}" aria-valuenow="${Math.min(g[k], t[k])}">${Array.from({ length: 24 }, (_, i) => `<i class="${(t[k] / g[k]) * 24 > i ? "filled" : ""}"></i>`).join("")}</div><small class="macro-caption">${sub}${t.missing[k] ? " · INCOMPLETE" : ""}</small></section>`,
-  )
-  .join("")}
-<section class="card water-tile" id="water-tile"><div class="section-head"><span class="macro-name">${icon("drop")} Hydration</span><button id="waterminus" class="water-minus" aria-label="Remove 250 milliliters">−</button></div><div class="water-content"><div class="water-number">${(d.water / 1000).toFixed(2).replace(/0$/, "")}<span> / ${g.water / 1000} L</span></div><button id="water" class="water-add" aria-label="Add 250 milliliters">${icon("plus")}<span>250 ml</span></button></div><div class="water-wave" style="--water-fill:${Math.min(100, (d.water / g.water) * 100)}%"><span></span></div><small class="macro-caption">SIP BY SIP. YOU'VE GOT THIS.</small></section>
+<div class="diary-composition">
+<section class="energy-overview" aria-labelledby="calories-heading">
+<div class="overview-heading"><div><span class="eyebrow">YOUR ENERGY, IN BALANCE</span><h2 id="calories-heading">Calories<span class="heading-dot">.</span></h2></div><button class="goal-edit" id="editgoals"><span>Daily goal</span><b>${num(g.kcal)} <small>kcal</small></b>${icon("note")}</button></div>
+<div class="meter-stage">
+<div class="meter-axis" aria-hidden="true"></div>
+<div class="flank-stat eaten-stat"><span>Eaten</span><b data-count="kcal">${num(t.kcal)}</b><small>kcal logged</small></div>
+<div class="meter-orb"><div class="orb-aura"></div><svg class="energy-dial" viewBox="0 0 250 250" role="img" aria-label="${Math.round(balance.progress * 100)} percent of daily energy budget logged"><defs><linearGradient id="neon-energy" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#36e7ec"/><stop offset=".5" stop-color="#41f6af"/><stop offset="1" stop-color="#a0ff68"/></linearGradient><filter id="ring-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter></defs><circle class="orbit-line orbit-outer" cx="125" cy="125" r="121"/><circle class="orbit-line orbit-fragment" cx="125" cy="125" r="113" stroke-dasharray="255 455"/><circle class="dial-track" cx="125" cy="125" r="96"/><circle class="energy-glow" cx="125" cy="125" r="96" stroke="url(#neon-energy)" stroke-dasharray="603.19" stroke-dashoffset="${603.19 * (1 - balance.progress)}" filter="url(#ring-glow)"/><circle class="energy-ring" cx="125" cy="125" r="96" stroke="url(#neon-energy)" stroke-dasharray="603.19" stroke-dashoffset="${603.19 * (1 - balance.progress)}"/></svg><div class="orb-center"><span class="cal-left-label">${icon("bolt")} ${balance.left < 0 ? "Above budget" : "Cal left"}</span><strong data-count="left">${num(Math.abs(balance.left))}</strong><span class="orb-unit">KILOCALORIES</span></div><span class="meter-readout">${Math.round(balance.progress * 100)}% OF DAILY BUDGET</span></div>
+<button class="flank-stat burned-stat" id="burned" aria-label="Edit calories burned"><span>Burned ${icon("plus")}</span><b>${num(balance.burned)}</b><small>kcal · add activity</small></button>
 </div>
-${Object.values(t.missing).some(Boolean) ? '<p class="notice partial-notice">Some logged foods have unknown macros. The macro tiles show known amounts; all calories are included.</p>' : ""}
-<div class="lower-grid"><section class="meal-section"><div class="meal-title"><div><span class="eyebrow">THE GOOD STUFF</span><h2>On the <em>menu.</em></h2></div><button class="solid" id="addfood">${icon("plus")} Log food</button></div><div class="meals">${meals
+<div class="macro-strip">${[
+      ["c", "Carbs", "carbs"],
+      ["p", "Protein", "protein"],
+      ["f", "Fat", "fat"],
+    ]
+      .map(
+        ([k, l, cls]) =>
+          `<section class="macro-readout ${cls}" aria-label="${l} progress"><div class="section-head"><span>${l}</span><span class="macro-percent">${t.missing[k] ? "Partial" : Math.round((t[k] / g[k]) * 100) + "%"}</span></div><div class="macro-line" role="progressbar" aria-label="${l}${t.missing[k] ? " (known amounts only)" : ""}" aria-valuemin="0" aria-valuemax="${g[k]}" aria-valuenow="${Math.min(g[k], t[k])}"><i style="width:${Math.min(100, (t[k] / g[k]) * 100)}%"></i></div><div class="macro-data"><b data-count="${k}">${Math.round(t[k] * 10) / 10}</b><b>${t.missing[k] ? "+" : ""}<small>g</small></b><span>/ ${g[k]} g</span></div></section>`,
+      )
+      .join("")}</div>
+${Object.values(t.missing).some(Boolean) ? '<p class="partial-notice">Macro values are partial: some logged foods have unknown macros. All calories are included.</p>' : ""}
+<div class="energy-footnote"><span class="status-pulse"></span><span>Your rhythm. Your targets.<small>${num(balance.budget)} kcal budget${balance.burned ? " · includes logged activity" : ""}</small></span><span class="footnote-icon">${icon("goals")}</span></div>
+</section>
+<section class="meal-section" aria-labelledby="meals-heading"><div class="meal-title"><div><span class="eyebrow">ON YOUR PLATE</span><h2 id="meals-heading">Eaten</h2></div><button class="analyze-trigger" id="analyze-meals">${icon("spark")} Analyze ${icon("arrow")}</button></div><div class="meals">${meals
       .map((m, i) => {
         const es = d.entries.filter((e) => e.meal === m);
-        return `<article class="card meal meal-${i}"><div class="meal-header"><div class="meal-icon">${icon(icons[i])}</div><div><h3>${m}</h3><small>${["Start a little brighter", "Your midday moment", "An afternoon pause", "End the day your way"][i]}</small></div><span class="count">${num(es.reduce((a, e) => a + e.kcal, 0))}<small> kcal</small></span><button class="plus" data-meal="${m}" aria-label="Add to ${m}">${icon("plus")}</button></div>${es.length ? es.map((e) => `<div class="entry"><span>${esc(e.name)}<small>${e.quantity ? e.quantity + " × " : ""}${esc(e.serving || "Estimated portion")}${[e.p, e.c, e.f].some((v) => v == null) ? " · macros incomplete" : ""}</small></span><b>${num(e.kcal)}</b><button class="remove" data-remove="${e.id}" aria-label="Remove ${esc(e.name)}">${icon("close")}</button></div>`).join("") : `<div class="meal-empty"><span>Something delicious goes here.</span><span class="empty-dash" aria-hidden="true">—</span></div>`}</article>`;
+        return `<article class="meal meal-${i}"><div class="meal-header"><span class="meal-icon">${icon(icons[i])}</span><div><h3>${m}</h3><small>${es.length ? es.length + " food" + (es.length === 1 ? "" : "s") + " logged" : ["Start your day", "Your midday moment", "An afternoon pause", "End the day your way"][i]}</small></div><span class="count">${num(es.reduce((a, e) => a + e.kcal, 0))}<small> kcal</small></span><button class="plus" data-meal="${m}" aria-label="Add to ${m}">${icon("plus")}</button></div>${es.length ? es.map((e) => `<div class="entry"><span>${esc(e.name)}<small>${e.quantity ? e.quantity + " × " : ""}${esc(e.serving || "Estimated portion")}${[e.p, e.c, e.f].some((v) => v == null) ? " · macros incomplete" : ""}</small></span><b>${num(e.kcal)}</b><button class="remove" data-remove="${e.id}" aria-label="Remove ${esc(e.name)}">${icon("close")}</button></div>`).join("") : ""}</article>`;
       })
-      .join("")}</div></section>
-<div class="everyday-stack"><div class="local-card"><div class="section-head"><span class="eyebrow">A LITTLE MORE LOCAL</span><span>↗</span></div><div class="mate-visual" aria-hidden="true">🧉<span>BUEN PROVECHO</span></div><h2>Made for the way<br><em>you actually eat.</em></h2><p>Empanadas. Mate. Sunday asado.<br>Your favorites have a place here.</p><button id="browse-foods" class="textbtn">Explore Argentine foods ${icon("arrow")}</button></div><div class="card notes-card"><div class="section-head"><h2>${icon("note")} A note to yourself</h2><button class="textbtn" id="notes" aria-label="${d.note ? "Edit" : "Add"} daily note">${icon(d.note ? "note" : "plus")}</button></div><p class="note-copy">${d.note ? esc(d.note) : "How did today feel? There’s more to your day than numbers."}</p></div></div></div>`;
+      .join(
+        "",
+      )}</div><button class="log-food-row" id="addfood">${icon("plus")} Log something delicious <span>↗</span></button><div class="scan-inline"><div class="scan-inline-symbol">${icon("camera")}</div><div><b>A photo. A starting point.</b><p>AI estimates, reviewed by you.</p></div><button class="textbtn" id="photo" aria-label="Scan meal photo">Scan ${icon("arrow")}</button></div></section>
+</div>
+<div class="support-strip"><section class="hydration-module" id="water-tile"><span class="support-icon">${icon("drop")}</span><div><h2>Stay in your flow.</h2><p><b>${(d.water / 1000).toFixed(2).replace(/0$/, "")} L</b> / ${g.water / 1000} L of water</p></div><div class="water-controls"><button id="waterminus" aria-label="Remove 250 milliliters">−</button><button id="water">${icon("plus")} 250 ml</button></div><div class="water-wave" style="--water-fill:${Math.min(100, (d.water / g.water) * 100)}%"><span></span></div></section><section class="notes-module"><div class="section-head"><h2>${icon("note")} Daily notes</h2><button id="notes" class="textbtn" aria-label="${d.note ? "Edit" : "Add"} daily note">${icon("plus")}</button></div><p>${d.note ? esc(d.note) : "How did today feel? Every detail counts."}</p></section><button class="local-module" id="browse-foods"><span class="eyebrow">A LITTLE MORE LOCAL</span><b>From mate to milanesa.</b><span>Explore Argentine foods ${icon("arrow")}</span></button></div>`;
   $("#date").onchange = (e) => {
     if (e.target.value) {
       date = e.target.value;
@@ -159,9 +171,7 @@ ${Object.values(t.missing).some(Boolean) ? '<p class="notice partial-notice">Som
     ["next", 1],
   ])
     $("#" + id).onclick = () => {
-      const dt = new Date(date + "T12:00:00Z");
-      dt.setUTCDate(dt.getUTCDate() + n);
-      date = dt.toISOString().slice(0, 10);
+      date = shiftDate(date, n);
       render();
     };
   $("#editgoals").onclick = () => {
@@ -172,16 +182,14 @@ ${Object.values(t.missing).some(Boolean) ? '<p class="notice partial-notice">Som
   document
     .querySelectorAll("[data-meal]")
     .forEach((b) => (b.onclick = () => openFood(b.dataset.meal)));
-  document
-    .querySelectorAll("[data-remove]")
-    .forEach(
-      (b) =>
-        (b.onclick = () =>
-          updateDay({
-            ...day(),
-            entries: day().entries.filter((e) => e.id !== b.dataset.remove),
-          })),
-    );
+  document.querySelectorAll("[data-remove]").forEach(
+    (b) =>
+      (b.onclick = () =>
+        updateDay({
+          ...day(),
+          entries: day().entries.filter((e) => e.id !== b.dataset.remove),
+        })),
+  );
   $("#water").onclick = () => {
     const before = day().water;
     updateDay({ ...day(), water: before + 250 });
@@ -194,6 +202,15 @@ ${Object.values(t.missing).some(Boolean) ? '<p class="notice partial-notice">Som
   $("#waterminus").onclick = () =>
     updateDay({ ...day(), water: Math.max(0, day().water - 250) });
   $("#photo").onclick = openPhoto;
+  $("#analyze-meals").onclick = openPhoto;
+  $("#burned").onclick = logActivity;
+  document.querySelectorAll("[data-day]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        date = b.dataset.day;
+        render();
+      }),
+  );
   $("#browse-foods").onclick = () => {
     view = "foods";
     category = "Argentine";
@@ -210,6 +227,18 @@ ${Object.values(t.missing).some(Boolean) ? '<p class="notice partial-notice">Som
       updateDay({ ...day(), note: $("#note").value });
       $("#modal").close();
     };
+  };
+}
+function logActivity() {
+  modal(
+    "Activity calories",
+    `<p class="notice">Enter your total calories burned from activity for ${esc(date)}. Use an estimate from your watch or activity log. This adds to your daily calorie budget.</p><form id="activityform"><label class="field">Calories burned (kcal)<input id="activity-kcal" type="number" min="0" max="10000" step="1" value="${day().burned || 0}" required></label><button class="solid full">Save activity</button></form>`,
+  );
+  $("#activityform").onsubmit = (e) => {
+    e.preventDefault();
+    updateDay({ ...day(), burned: Number($("#activity-kcal").value) });
+    $("#modal").close();
+    toast("Activity updated. Your energy budget is in sync.");
   };
 }
 function allFoods() {
@@ -239,7 +268,7 @@ function renderFoods() {
   ];
   $("#app").innerHTML =
     heading(
-      "Good food. <em>Real life.</em>",
+      "Food <span>library.</span>",
       "Your everyday favorites, all in one place.",
       `<button class="solid" id="custom">${icon("plus")} Create food</button>`,
     ) +
@@ -341,7 +370,11 @@ function addEntry(e) {
   });
   const after = total();
   if (view === "diary") {
-    animateDashboard(before, after, state.goals);
+    animateDashboard(
+      before,
+      after,
+      calorieBalance(state.goals.kcal, after.kcal, day().burned).budget,
+    );
     document
       .querySelector(`[data-meal="${e.meal}"]`)
       ?.closest(".meal")
@@ -402,7 +435,7 @@ function renderGoals() {
   const g = state.goals;
   $("#app").innerHTML =
     heading(
-      "A little <em>direction.</em>",
+      "Your <span>goals.</span>",
       "Your goals. Your rhythm. Make it work for you.",
     ) +
     `<div class="card settings-card"><h2>Daily nutrition targets</h2><p style="font-size:12px">Set your own targets, or use values recommended by your nutrition professional.</p><form id="goalsform"><div class="two">${[
@@ -460,6 +493,8 @@ function validState(s) {
             meals.includes(e.meal) &&
             validNutrients(e),
         ) &&
+        (v.burned === undefined ||
+          (Number.isFinite(v.burned) && v.burned >= 0 && v.burned <= 10000)) &&
         Number.isFinite(v.water) &&
         v.water >= 0 &&
         typeof v.note === "string",
@@ -500,7 +535,7 @@ function renderProgress() {
   const latest = state.weights.at(-1);
   $("#app").innerHTML =
     heading(
-      "Look how far <em>you’ve come.</em>",
+      "Your <span>progress.</span>",
       "Your habits tell a story. Give them time.",
     ) +
     `<div class="grid"><div class="card"><h2>The last 7 days</h2><p style="font-size:11px">Calories logged · daily target ${num(state.goals.kcal)} kcal</p>${dates
@@ -621,7 +656,7 @@ function reviewPhoto(data, ai) {
     toast("Meal added to diary");
   };
 }
-document.querySelectorAll("nav button").forEach(
+document.querySelectorAll("nav [data-view]").forEach(
   (b) =>
     (b.onclick = () => {
       view = b.dataset.view;
@@ -633,6 +668,13 @@ $("#export").onclick = exportData;
 $("#modal").addEventListener("click", (e) => {
   if (e.target === $("#modal")) $("#modal").close();
 });
+$("#dock-log").onclick = () => openFood("Breakfast");
+$(".brand").onclick = (e) => {
+  e.preventDefault();
+  view = "diary";
+  render();
+  window.scrollTo(0, 0);
+};
 hydrateIcons();
 initTheme();
 render();
