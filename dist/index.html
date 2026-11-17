@@ -34,59 +34,63 @@
     <a class="skip-link" href="#app">Skip to content</a>
     <div class="ambient" aria-hidden="true"></div>
     <main>
-      <header class="topbar">
-        <a class="brand" href="#" aria-label="NutriAR diary"
-          ><img
-            class="brand-mark"
-            src="/assets/brand/mark.svg"
-            width="44"
-            height="44"
-            alt=""
-          /><span
-            >nutri<span class="brand-end">ar</span
-            ><small>DAILY NUTRITION, IN FOCUS.</small></span
-          ></a
-        >
-        <div class="header-actions">
-          <a class="about-link" href="/welcome.html">About NutriAR</a
-          ><label class="language-control"
-            ><span class="sr-only">Languages</span
-            ><select id="language-select" aria-label="Languages">
-              <option value="es">ES</option>
-              <option value="en">EN</option>
-            </select></label
-          >
-          <button
-            class="icon"
-            id="theme-toggle"
-            aria-label="Switch to light mode"
-            aria-pressed="true"
-          ></button
-          ><button
-            class="icon"
-            id="export"
-            aria-label="Export your data"
-            title="Export data"
-          >
-            <span data-icon="download"></span>
-          </button>
-        </div>
-      </header>
-      <div
-        id="save-status"
-        class="save-status"
-        role="status"
-        aria-live="polite"
-      >
-        <span id="save-message"
-          >Saved on this device · checking cloud saving…</span
-        >
-        <a id="sync-signin" href="/api/auth" hidden>Sign in to sync</a>
-        <button id="sync-conflict" class="textbtn" hidden>Review copies</button>
-        <button id="sync-now" class="textbtn">Sync now</button
-        ><button id="check-storage" class="textbtn">Check cloud</button>
-      </div>
       <div id="app" tabindex="-1"></div>
+      <section class="bottom-utilities" aria-label="App controls">
+        <div class="topbar bottom-brandbar">
+          <a class="brand" href="#" aria-label="NutriAR diary"
+            ><img
+              class="brand-mark"
+              src="/assets/brand/mark.svg"
+              width="44"
+              height="44"
+              alt=""
+            /><span
+              >nutri<span class="brand-end">ar</span
+              ><small>DAILY NUTRITION, IN FOCUS.</small></span
+            ></a
+          >
+          <div class="header-actions">
+            <a class="about-link" href="/welcome.html">About NutriAR</a
+            ><label class="language-control"
+              ><span class="sr-only">Languages</span
+              ><select id="language-select" aria-label="Languages">
+                <option value="es">ES</option>
+                <option value="en">EN</option>
+              </select></label
+            >
+            <button
+              class="icon"
+              id="theme-toggle"
+              aria-label="Switch to light mode"
+              aria-pressed="true"
+            ></button
+            ><button
+              class="icon"
+              id="export"
+              aria-label="Export your data"
+              title="Export data"
+            >
+              <span data-icon="download"></span>
+            </button>
+          </div>
+        </div>
+        <div
+          id="save-status"
+          class="save-status"
+          role="status"
+          aria-live="polite"
+        >
+          <span id="save-message"
+            >Saved on this device · checking cloud saving…</span
+          >
+          <a id="sync-signin" href="/api/auth" hidden>Sign in to sync</a>
+          <button id="sync-conflict" class="textbtn" hidden>
+            Review copies
+          </button>
+          <button id="sync-now" class="textbtn">Sync now</button
+          ><button id="check-storage" class="textbtn">Check cloud</button>
+        </div>
+      </section>
       <footer>
         <span>BUILT AROUND YOUR EVERYDAY.</span
         ><span>Nutrition with an Argentine accent. <b>AR ↗</b></span>

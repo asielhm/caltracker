@@ -1,5 +1,6 @@
 // UI copy is translated locally. Diary values and user-authored content are never rewritten.
 const es = {
+  "App controls": "Controles de la app",
   "Skip to content": "Saltar al contenido",
   "Your daily diary.": "Tu diario de todos los días.",
   "DAILY NUTRITION, IN FOCUS.": "TU NUTRICIÓN, A TU RITMO.",

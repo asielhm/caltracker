@@ -108,6 +108,7 @@ function heading(title, sub, control = "") {
   return `<div class="intro"><div><h1>${title}</h1><p>${sub}</p></div>${control}</div>`;
 }
 function render() {
+  document.body.dataset.view = view;
   document
     .querySelectorAll("nav [data-view]")
     .forEach((b) => b.classList.toggle("active", b.dataset.view === view));
@@ -126,12 +127,9 @@ function renderDiary() {
     g = state.goals,
     balance = calorieBalance(g.kcal, t.kcal, activityForDay(d));
   $("#app").innerHTML =
-    heading(
-      "My <span>Diary</span>",
-      "A little more balance. A little more you.",
-      `<span class="live-label"><i></i> DAILY OVERVIEW</span>`,
-    ) +
+    '<h1 class="sr-only">My diary</h1><div class="diary-date-tools">' +
     dateControl() +
+    "</div>" +
     `
 <div class="diary-composition">
 <section class="energy-overview" aria-labelledby="calories-heading">
