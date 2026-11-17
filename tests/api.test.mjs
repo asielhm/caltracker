@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createApi, validateImage, validAnalysis } from "../api.mjs";
+import {
+  createApi,
+  validateImage,
+  validAnalysis,
+  compatibleGeminiModels,
+} from "../api.mjs";
 const image =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=";
 const estimate = {
@@ -90,7 +95,7 @@ test("sends image and notes to Gemini generateContent with inline image data and
     fetchImpl: async (url, options) => {
       assert.equal(
         url,
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent",
       );
       assert.equal(options.headers["x-goog-api-key"], "test-key");
       payload = JSON.parse(options.body);
@@ -192,24 +197,103 @@ test("rejects concurrent analyses for the same actor", async () => {
   finish();
   assert.equal((await pending).status, 200);
 });
-test("unavailable configured models retry once on the compatible default", async () => {
-  const urls = [];
+test("unavailable models are replaced only with models returned by the same key", async () => {
+  const calls = [];
   const api = createApi({
-    fetchImpl: async (url) => {
-      urls.push(url);
-      return urls.length === 1
-        ? new Response(JSON.stringify({ error: { status: "NOT_FOUND" } }), {
-            status: 404,
-          })
-        : completion(estimate);
+    fetchImpl: async (url, options) => {
+      calls.push({ url, method: options.method });
+      if (options.method === "GET")
+        return Response.json({
+          models: [
+            {
+              name: "models/gemini-4-hydrogen",
+              supportedGenerationMethods: ["generateContent"],
+            },
+          ],
+        });
+      return url.includes("gemini-4-hydrogen")
+        ? completion(estimate)
+        : Response.json({ error: { status: "NOT_FOUND" } }, { status: 404 });
     },
   });
-  assert.equal(
-    (await api(req(), { ...env, GEMINI_MODEL: "gemini-unavailable" })).status,
-    200,
-  );
-  assert.equal(urls.length, 2);
-  assert.match(urls[1], /gemini-2\.5-flash:generateContent$/);
+  const environment = { ...env, GEMINI_MODEL: "gemini-unavailable" };
+  assert.equal((await api(req(), environment)).status, 200);
+  assert.equal(calls.length, 3);
+  assert.equal(calls[1].method, "GET");
+  assert.match(calls[2].url, /gemini-4-hydrogen:generateContent$/);
+  assert.equal((await api(req(), environment)).status, 200);
+  assert.equal(calls.length, 4);
+  assert.match(calls[3].url, /gemini-4-hydrogen/);
+});
+test("catalog selection excludes specialized models and generation-incompatible entries", () => {
+  const models = [
+    {
+      name: "models/gemini-4-hydrogen",
+      supportedGenerationMethods: ["generateContent"],
+    },
+    {
+      name: "models/gemini-3.8-flash-tts",
+      supportedGenerationMethods: ["generateContent"],
+    },
+    {
+      name: "models/gemini-2.5-flash",
+      supportedGenerationMethods: ["countTokens"],
+    },
+    {
+      name: "models/gemini-4-carbon",
+      supportedGenerationMethods: ["generateContent"],
+      supportedInputModalities: ["TEXT"],
+    },
+  ];
+  assert.deepEqual(compatibleGeminiModels(models), ["gemini-4-hydrogen"]);
+});
+test("an empty model catalog returns an account-access error instead of another guessed model", async () => {
+  const calls = [];
+  const api = createApi({
+    fetchImpl: async (url, options) => {
+      calls.push(url);
+      return options.method === "GET"
+        ? Response.json({ models: [] })
+        : Response.json({ error: { status: "NOT_FOUND" } }, { status: 404 });
+    },
+  });
+  const response = await api(req(), env);
+  assert.equal((await response.json()).code, "NO_COMPATIBLE_MODELS");
+  assert.equal(calls.length, 2);
+});
+test("model discovery follows catalog pagination and never retries quota failures", async () => {
+  let listings = 0,
+    generations = 0;
+  const api = createApi({
+    fetchImpl: async (url, options) => {
+      if (options.method === "GET") {
+        listings++;
+        if (listings === 1)
+          return Response.json({ models: [], nextPageToken: "page two" });
+        assert.match(url, /pageToken=page\+two/);
+        return Response.json({
+          models: [
+            {
+              name: "models/gemini-4-hydrogen",
+              supportedGenerationMethods: ["generateContent"],
+            },
+          ],
+        });
+      }
+      generations++;
+      return Response.json(
+        {
+          error: {
+            status: generations === 1 ? "NOT_FOUND" : "RESOURCE_EXHAUSTED",
+          },
+        },
+        { status: generations === 1 ? 404 : 429 },
+      );
+    },
+  });
+  assert.equal((await api(req(), env)).status, 429);
+  assert.equal(listings, 2);
+  assert.equal(generations, 2);
 });
 test("unsupported schema options fall back to JSON prompting with server validation", async () => {
   const bodies = [];

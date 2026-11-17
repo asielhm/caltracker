@@ -13,7 +13,7 @@ A responsive calorie and macro diary with 89 Argentine/everyday foods, camera-ba
    | `GEMINI_API_KEY` | Your Google AI Studio API key |
    | `APP_PASSWORD` | A strong private password for your photo API |
 
-   Optionally set `GEMINI_MODEL`; the default is `gemini-2.5-flash`. Never prefix the key with `NEXT_PUBLIC_` or `VITE_`.
+   Optionally set `GEMINI_MODEL`; the default is `gemini-flash-latest`. Never prefix the key with `NEXT_PUBLIC_` or `VITE_`.
 5. Deploy. Vercel's Git integration deploys future pushes to `main` automatically. Pull requests/non-production branches get previews according to your Vercel settings.
 6. On any device, open the deployed URL, open **Analyze**, and follow **Sign in** if prompted. Username: **nutriar**. Password: the `APP_PASSWORD` you configured. The Gemini key remains on the server and is shared across sessions; users do not enter or save it in the app.
 7. After setting/changing environment variables, **redeploy** so the running functions receive them.
@@ -49,7 +49,7 @@ npm run build:worker
 Photos are not persisted by NutriAR and are sent to Google Gemini only when Analyze is clicked. Provider handling is governed by the Google AI Studio project's data settings; NutriAR does not request persistent Gemini conversation state; provider retention and processing follow your Google AI Studio project terms. Only the confirmed nutrition estimate is saved in the browser diary. Photo estimates are approximate, particularly for hidden fats and ambiguous portions.
 
 ### Server configuration
-Set `GEMINI_API_KEY` privately on the hosting provider. Never put it in client code, GitHub, `.openai/hosting.json`, or a committed `.env`. `GEMINI_MODEL` defaults to `gemini-2.5-flash`, a vision/structured-output capable model. The server reports readiness without exposing the key. Valid API access and billing are required. Configure project budgets/usage controls in the Google AI Studio account.
+Set `GEMINI_API_KEY` privately on the hosting provider. Never put it in client code, GitHub, `.openai/hosting.json`, or a committed `.env`. `GEMINI_MODEL` defaults to `gemini-flash-latest`, a vision/structured-output capable model. The server reports readiness without exposing the key. Valid API access and billing are required. Configure project budgets/usage controls in the Google AI Studio account.
 
 - **Live Sites app:** `scripts/build-worker.mjs` bundles all browser assets and the API into `dist/server/index.js`. Preserve the selected project ID in `.openai/hosting.json` and remove `static` when publishing the Worker. The Sites secret configuration supplies the key at runtime. Site authentication protects the app; paid analysis additionally requires the authenticated visitor header supplied by Sites. The current Site remains owner-private.
 - **Node deployment:** deploy `server.mjs`, `api.mjs` and `dist/`. Set `HOST=0.0.0.0`, `APP_PASSWORD` and the host's `PORT`. Username: `nutriar`. Use HTTPS. If behind an HTTPS proxy, set `PUBLIC_ORIGIN` to the exact public HTTPS origin so origin checks match.
@@ -71,4 +71,8 @@ Dark-first obsidian design, layered calorie meter, unboxed macros, date capsules
 Gemini references: [image inputs](https://aistudio.google.com/docs/image-understanding), [structured outputs](https://aistudio.google.com/docs/structured-output) and [Interactions API](https://aistudio.google.com/docs/interactions-overview).
 
 ### Gemini compatibility and diagnostics
-The backend uses `generateContent` with `gemini-2.5-flash` by default. A configured model returning 404 retries once on that default. Unsupported schema configuration retries once with a minimal request and explicit JSON instructions; the same server validation still applies. Google HTTP status is returned as `providerStatus` alongside a specific error code. Server logs contain only status/code, never the key, meal notes, photo, or raw upstream message.
+The backend starts with `GEMINI_MODEL` (default `gemini-flash-latest`). You can explicitly set `gemini-4-hydrogen` if your Google project grants access. Enter only the ID in Vercel, without quotes or `model=`. The `models/` prefix is normalized if supplied.
+
+If Google returns 404, the backend lists models using the **same server key**, follows up to five catalog pages, filters out non-generation and specialized audio/image-generation models, and tries at most two catalog-advertised alternatives. A successful selection is cached for five minutes per process and invalidated when the key or configured model changes. Catalog visibility is not a guarantee of inference entitlement: if Google advertises models but still rejects generation, the app reports an account/API-access problem rather than recommending another guessed model.
+
+Unsupported schema configuration retries once with a minimal request and explicit JSON instructions; server nutrition validation still applies. Google HTTP status is returned as `providerStatus` alongside a specific error code. Server logs contain only status/code, never the key, meal notes, photo, or raw upstream message.
